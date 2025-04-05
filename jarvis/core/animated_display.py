@@ -464,9 +464,8 @@ class AnimatedDisplayWindow:
         self.particles = []
         self._init_particles()
         
-        # Create radial lines for additional visual effect
+        # Initialize empty radial_lines list but don't create any lines
         self.radial_lines = []
-        self._create_radial_lines(center_x, center_y, radius)
     
     def _init_particles(self):
         """
@@ -584,28 +583,7 @@ class AnimatedDisplayWindow:
         # Add to particles list
         self.particles.append(particle)
     
-    def _create_radial_lines(self, center_x, center_y, radius):
-        """
-        Create radial lines emanating from the center circle.
-        """
-        num_lines = 12
-        line_length = radius * 0.7  # Length of lines relative to circle radius
-        
-        for i in range(num_lines):
-            angle = (i / num_lines) * math.pi * 2
-            x1 = center_x + math.cos(angle) * radius
-            y1 = center_y + math.sin(angle) * radius
-            x2 = center_x + math.cos(angle) * (radius + line_length)
-            y2 = center_y + math.sin(angle) * (radius + line_length)
-            
-            line = self.canvas.create_line(
-                x1, y1, x2, y2,
-                fill=self.color_scheme["accent"],
-                width=1,
-                dash=(3, 3),  # Dashed line
-                state=tk.HIDDEN  # Initially hidden
-            )
-            self.radial_lines.append(line)
+    # Removed radial lines method
     
     def _animate(self):
         """
@@ -750,28 +728,7 @@ class AnimatedDisplayWindow:
                 center_x + glow_radius, center_y + glow_radius
             )
         
-        # Update radial lines visibility and length based on intensity
-        for i, line_id in enumerate(self.radial_lines):
-            angle = (i / len(self.radial_lines)) * math.pi * 2
-            
-            # Only show lines when intensity is high enough
-            if self.animation_intensity > 0.4:
-                self.canvas.itemconfig(line_id, state=tk.NORMAL)
-                
-                # Calculate line endpoints
-                x1 = center_x + math.cos(angle) * radius
-                y1 = center_y + math.sin(angle) * radius
-                
-                # Line length varies with intensity and time
-                line_pulse = math.sin(current_time * 3 + i * 0.5) * 0.3 + 0.7
-                line_length = radius * 0.7 * self.animation_intensity * line_pulse
-                
-                x2 = center_x + math.cos(angle) * (radius + line_length)
-                y2 = center_y + math.sin(angle) * (radius + line_length)
-                
-                self.canvas.coords(line_id, x1, y1, x2, y2)
-            else:
-                self.canvas.itemconfig(line_id, state=tk.HIDDEN)
+        # Radial lines have been removed
         
         # Update particles
         self._update_particles(center_x, center_y, particle_spawn_rate)
@@ -794,10 +751,6 @@ class AnimatedDisplayWindow:
                 self.canvas.itemconfig(glow_id, outline=target_glow)
             else:  # Secondary glow
                 self.canvas.itemconfig(glow_id, outline=target_secondary)
-        
-        # Update radial lines
-        for line_id in self.radial_lines:
-            self.canvas.itemconfig(line_id, fill=target_color)
         
         # Schedule next animation frame
         self.root.after(30, self._animate)
@@ -1192,19 +1145,237 @@ class AnimatedDisplayWindow:
             status_font = ("Segoe UI", 11, "bold")
             footer_text = "💬 Speaking..."
         
-        # Update status indicator
+        # Update status indicator with smooth transition effect
         if hasattr(self, 'status_indicator') and self.status_indicator:
             try:
-                self.status_indicator.config(text=status_text, fg=status_color, font=status_font)
+                # First update text
+                self.status_indicator.config(text=status_text, font=status_font)
+                
+                # Then animate color change
+                current_color = self.status_indicator.cget("foreground")
+                self._animate_color_change(self.status_indicator, current_color, status_color, "foreground", 300)
             except Exception:
                 pass  # Ignore errors if widget is being destroyed
                 
-        # Update footer text
+        # Update footer text with animation
         if hasattr(self, 'footer_text') and self.footer_text:
             try:
-                self.footer_text.config(text=footer_text)
+                # Animate text change with fade effect
+                current_text = self.footer_text.cget("text")
+                if current_text != footer_text:
+                    # Fade out
+                    self._animate_opacity(self.footer_text, 1.0, 0.3, 100, 
+                                        lambda: self.footer_text.config(text=footer_text))
+                    # Then fade in
+                    self.root.after(150, lambda: self._animate_opacity(self.footer_text, 0.3, 1.0, 100))
+                else:
+                    self.footer_text.config(text=footer_text)
             except Exception:
                 pass  # Ignore errors if widget is being destroyed
+    
+    def _create_state_change_effect(self):
+        """
+        Create a ripple effect when the animation state changes.
+        This provides immediate visual feedback of state changes.
+        """
+        if not self.is_running or not self.canvas:
+            return
+            
+        # Get canvas center
+        center_x = self.canvas_width / 2
+        center_y = self.canvas_height / 2
+        
+        # Determine ripple color based on new state
+        if self.animation_state == "idle":
+            ripple_color = self.color_scheme["accent"]
+        elif self.animation_state == "listening":
+            ripple_color = self.color_scheme["success"]
+        elif self.animation_state == "speaking":
+            ripple_color = self.color_scheme["warning"]
+        else:
+            ripple_color = self.color_scheme["accent"]
+        
+        # Create expanding ripple circles
+        ripples = []
+        for i in range(3):  # Create 3 ripples with staggered starts
+            ripple = {
+                "id": self.canvas.create_oval(
+                    center_x - 5, center_y - 5,
+                    center_x + 5, center_y + 5,
+                    outline=ripple_color,
+                    width=2,
+                    fill=""
+                ),
+                "radius": 5,
+                "max_radius": 100 + (i * 20),
+                "delay": i * 5,  # Frames to delay start
+                "active": False,
+                "opacity": 1.0,
+                "color": ripple_color
+            }
+            ripples.append(ripple)
+        
+        # Animate ripples
+        def animate_ripples(ripples, frame=0):
+            still_active = False
+            
+            for ripple in ripples:
+                # Check if ripple should start
+                if frame >= ripple["delay"] and not ripple["active"]:
+                    ripple["active"] = True
+                
+                # Update active ripples
+                if ripple["active"]:
+                    # Expand radius
+                    ripple["radius"] += 3
+                    
+                    # Fade opacity as it expands
+                    progress = ripple["radius"] / ripple["max_radius"]
+                    ripple["opacity"] = max(0, 1.0 - progress)
+                    
+                    # Update ripple on canvas
+                    self.canvas.coords(
+                        ripple["id"],
+                        center_x - ripple["radius"], center_y - ripple["radius"],
+                        center_x + ripple["radius"], center_y + ripple["radius"]
+                    )
+                    
+                    # Update opacity by changing color
+                    r, g, b = self._hex_to_rgb(ripple["color"])
+                    opacity_hex = int(255 * ripple["opacity"])
+                    color_with_opacity = f"#{r:02x}{g:02x}{b:02x}"
+                    
+                    # Update outline color and width
+                    self.canvas.itemconfig(
+                        ripple["id"], 
+                        outline=color_with_opacity,
+                        width=max(0.5, 2 * ripple["opacity"])
+                    )
+                    
+                    # Check if ripple is still active
+                    if ripple["radius"] < ripple["max_radius"]:
+                        still_active = True
+                    else:
+                        # Remove completed ripple
+                        self.canvas.delete(ripple["id"])
+            
+            # Continue animation if any ripples are still active
+            if still_active and self.is_running and self.root:
+                self.root.after(16, lambda: animate_ripples(ripples, frame + 1))
+        
+        # Start ripple animation
+        animate_ripples(ripples)
+    
+    def _animate_color_change(self, widget, start_color, end_color, property_name, duration_ms):
+        """
+        Animate color change for a widget property.
+        
+        Args:
+            widget: The tkinter widget to animate
+            start_color: Starting hex color
+            end_color: Ending hex color
+            property_name: Widget property to animate (e.g., 'foreground', 'background')
+            duration_ms: Animation duration in milliseconds
+        """
+        if not self.is_running or not self.root:
+            return
+            
+        # Convert hex colors to RGB
+        start_rgb = self._hex_to_rgb(start_color)
+        end_rgb = self._hex_to_rgb(end_color)
+        
+        # Number of steps for smooth animation
+        steps = max(5, min(20, duration_ms // 30))
+        step_time = duration_ms // steps
+        
+        def update_color(step):
+            if step > steps or not self.is_running:
+                return
+                
+            # Calculate interpolation progress
+            progress = step / steps
+            
+            # Apply easing function (ease-out)
+            progress = 1 - (1 - progress) ** 2
+            
+            # Interpolate color
+            r = int(start_rgb[0] + (end_rgb[0] - start_rgb[0]) * progress)
+            g = int(start_rgb[1] + (end_rgb[1] - start_rgb[1]) * progress)
+            b = int(start_rgb[2] + (end_rgb[2] - start_rgb[2]) * progress)
+            
+            # Apply color
+            current_color = f"#{r:02x}{g:02x}{b:02x}"
+            try:
+                widget.config(**{property_name: current_color})
+            except Exception:
+                return  # Stop if widget is destroyed
+                
+            # Schedule next update
+            if step < steps:
+                self.root.after(step_time, lambda: update_color(step + 1))
+        
+        # Start animation
+        update_color(0)
+    
+    def _animate_opacity(self, widget, start_opacity, end_opacity, duration_ms, midpoint_callback=None):
+        """
+        Animate opacity change for a widget.
+        
+        Args:
+            widget: The tkinter widget to animate
+            start_opacity: Starting opacity (0.0-1.0)
+            end_opacity: Ending opacity (0.0-1.0)
+            duration_ms: Animation duration in milliseconds
+            midpoint_callback: Optional function to call at animation midpoint
+        """
+        if not self.is_running or not self.root:
+            return
+            
+        # Get current foreground color
+        try:
+            current_color = widget.cget("foreground")
+            r, g, b = self._hex_to_rgb(current_color)
+        except Exception:
+            return  # Stop if widget is destroyed
+        
+        # Number of steps for smooth animation
+        steps = max(5, min(10, duration_ms // 30))
+        step_time = duration_ms // steps
+        
+        def update_opacity(step):
+            if step > steps or not self.is_running:
+                return
+                
+            # Calculate interpolation progress
+            progress = step / steps
+            
+            # Apply easing function (ease-in-out)
+            if progress < 0.5:
+                progress = 2 * progress * progress
+            else:
+                progress = 1 - pow(-2 * progress + 2, 2) / 2
+            
+            # Interpolate opacity
+            opacity = start_opacity + (end_opacity - start_opacity) * progress
+            
+            # Apply opacity by adjusting color
+            opacity_adjusted = self.color_scheme["text_dim"] if opacity < 0.5 else self.color_scheme["text"]
+            
+            try:
+                widget.config(fg=opacity_adjusted)
+            except Exception:
+                return  # Stop if widget is destroyed
+                
+            # Call midpoint callback if provided and we're at the midpoint
+            if midpoint_callback and step == steps // 2:
+                midpoint_callback()
+                
+            # Schedule next update
+            if step < steps:
+                self.root.after(step_time, lambda: update_opacity(step + 1))
+        
+        # Start animation
+        update_opacity(0)
 
     
     def stop(self):
