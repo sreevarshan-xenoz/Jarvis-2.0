@@ -388,29 +388,29 @@ class AnimatedDisplayWindow:
         # Create multiple wave lines for layered effect
         self.wave_lines = []
         
-        # Main wave line
-        self.wave_line = self.canvas.create_line(
-            [p["x"] for p in self.wave_points], 
-            [p["y"] for p in self.wave_points],
-            fill=self.color_scheme["accent"],
-            width=2.5,
-            smooth=True,
-            capstyle=tk.ROUND,
-            joinstyle=tk.ROUND
-        )
-        self.wave_lines.append(self.wave_line)
+        # Main wave line - disabled to remove line near mouse pointer
+        # self.wave_line = self.canvas.create_line(
+        #     [p["x"] for p in self.wave_points], 
+        #     [p["y"] for p in self.wave_points],
+        #     fill=self.color_scheme["accent"],
+        #     width=2.5,
+        #     smooth=True,
+        #     capstyle=tk.ROUND,
+        #     joinstyle=tk.ROUND
+        # )
+        # self.wave_lines.append(self.wave_line)
         
-        # Secondary wave lines with different colors and opacity
-        secondary_line = self.canvas.create_line(
-            [p["x"] for p in self.wave_points], 
-            [p["y"] for p in self.wave_points],
-            fill=self.color_scheme["accent_secondary"],
-            width=1.5,
-            smooth=True,
-            capstyle=tk.ROUND,
-            joinstyle=tk.ROUND
-        )
-        self.wave_lines.append(secondary_line)
+        # Secondary wave lines - disabled to remove line near mouse pointer
+        # secondary_line = self.canvas.create_line(
+        #     [p["x"] for p in self.wave_points], 
+        #     [p["y"] for p in self.wave_points],
+        #     fill=self.color_scheme["accent_secondary"],
+        #     width=1.5,
+        #     smooth=True,
+        #     capstyle=tk.ROUND,
+        #     joinstyle=tk.ROUND
+        # )
+        # self.wave_lines.append(secondary_line)
         
         # Create central circle with gradient fill
         center_x = self.canvas_width / 2
@@ -682,15 +682,17 @@ class AnimatedDisplayWindow:
             point["y"] = center_y + point["amplitude"]
         
         # Update all wave lines with different offsets for layered effect
-        for i, line_id in enumerate(self.wave_lines):
-            offset = i * 5  # Vertical offset between lines
-            y_offset = offset * self.animation_intensity
-            
-            self.canvas.coords(
-                line_id,
-                [p["x"] for p in self.wave_points],
-                [p["y"] + (i * y_offset) for p in self.wave_points]
-            )
+        # Skip wave line updates since we've disabled them
+        if self.wave_lines:  # Only process if there are wave lines
+            for i, line_id in enumerate(self.wave_lines):
+                offset = i * 5  # Vertical offset between lines
+                y_offset = offset * self.animation_intensity
+                
+                self.canvas.coords(
+                    line_id,
+                    [p["x"] for p in self.wave_points],
+                    [p["y"] + (i * y_offset) for p in self.wave_points]
+                )
         
         # Update center circle with pulse effect and breathing animation
         base_radius = 45
@@ -1001,7 +1003,8 @@ class AnimatedDisplayWindow:
         # Add a left border to indicate message source
         self.text_area.tag_add("message_border", message_start, message_end)
         self.text_area.tag_config("message_border", borderwidth=2, 
-                                relief="flat", border=self.color_scheme["accent"])
+                                relief="flat", background=self.color_scheme["bg_medium"],
+                                lmargin1=3, lmargin2=3)
         
         # Auto-scroll to the bottom with a slight delay for animation effect
         self.text_area.see(tk.END)
