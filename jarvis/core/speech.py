@@ -7,6 +7,7 @@ This module handles speech recognition and text-to-speech functionality.
 
 import speech_recognition as sr
 import pyttsx3
+from core.display import DisplayWindow
 
 class SpeechEngine:
     """
@@ -24,14 +25,27 @@ class SpeechEngine:
         self.engine = pyttsx3.init()
         voices = self.engine.getProperty('voices')
         self.engine.setProperty('voice', voices[0].id)  # Default to male voice
+        
+        # Initialize display window
+        self.display_window = DisplayWindow()
+        self.display_window.start()
     
     def speak(self, text):
         """
-        Convert text to speech.
+        Convert text to speech and display the text output.
         
         Args:
             text (str): The text to be spoken
         """
+        # Display text output in console with formatting
+        print("\n" + "="*50)
+        print(f"🤖 JARVIS: {text}")
+        print("="*50 + "\n")
+        
+        # Display text in GUI window
+        self.display_window.display(text)
+        
+        # Convert to speech
         self.engine.say(text)
         self.engine.runAndWait()
     

@@ -1,0 +1,22 @@
+# Jarvis Voice Assistant Dependencies
+
+# Core dependencies
+speech_recognition>=3.8.1
+pyttsx3>=2.90
+python-dotenv>=0.19.2
+
+# Web and API integrations
+requests>=2.27.1
+wikipedia>=1.4.0
+pyjokes>=0.6.0
+
+# GUI and animations
+tkinter>=8.6  # Usually comes with Python installation
+pillow>=9.0.0  # For image processing
+numpy>=1.22.0  # For numerical operations in animations
+
+# For advanced animations (optional but recommended)
+pygame>=2.1.2  # For more complex animations and sound visualization
+
+# LLM integration
+ollama>=0.1.0  # For local LLM integration

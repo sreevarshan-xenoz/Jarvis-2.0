@@ -67,3 +67,5 @@ class JarvisAssistant:
         """
         self.is_active = False
         self.speech_engine.speak("Goodbye!")
+        # Stop the display window
+        self.speech_engine.display_window.stop()

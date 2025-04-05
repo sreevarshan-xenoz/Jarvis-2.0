@@ -7,6 +7,9 @@ pyttsx3>=2.98  # Latest version tested with Python 3.12
 pywin32>=306  # Required by pyttsx3 on Windows
 comtypes>=1.2.0  # Required by pyttsx3 on Windows
 
+# GUI (tkinter is included in standard Python library)
+# No additional installation required for tkinter
+
 # Web and API interactions
 requests>=2.31.0
 pywhatkit>=5.4
