@@ -203,14 +203,14 @@ class AnimatedDisplayWindow:
         footer.pack(fill=tk.X, side=tk.BOTTOM, pady=(15, 0))
         
         # System status with icon
-        footer_text = tk.Label(
+        self.footer_text = tk.Label(
             footer, 
             text="⚡ System Ready", 
             font=("Segoe UI", 10), 
             fg=self.color_scheme["text_dim"], 
             bg=self.color_scheme["bg_dark"]
         )
-        footer_text.pack(side=tk.LEFT, padx=10)
+        self.footer_text.pack(side=tk.LEFT, padx=10)
         
         # Add time display to footer
         self.time_display = tk.Label(
@@ -281,6 +281,30 @@ class AnimatedDisplayWindow:
         hex_color = hex_color.lstrip('#')
         return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
     
+    def _interpolate_color(self, color1, color2, progress):
+        """
+        Interpolate between two hex colors.
+        
+        Args:
+            color1 (str): Starting hex color
+            color2 (str): Ending hex color
+            progress (float): Transition progress from 0.0 to 1.0
+            
+        Returns:
+            str: Interpolated hex color
+        """
+        # Convert hex colors to RGB
+        r1, g1, b1 = self._hex_to_rgb(color1)
+        r2, g2, b2 = self._hex_to_rgb(color2)
+        
+        # Interpolate each component
+        r = int(r1 + (r2 - r1) * progress)
+        g = int(g1 + (g2 - g1) * progress)
+        b = int(b1 + (b2 - b1) * progress)
+        
+        # Convert back to hex
+        return f"#{r:02x}{g:02x}{b:02x}"
+    
     def _create_hover_button(self, parent, text, tooltip_text):
         """
         Create a button with hover effect and tooltip.
@@ -344,7 +368,7 @@ class AnimatedDisplayWindow:
         self.canvas_height = self.canvas.winfo_reqheight()
         
         # Create wave points for the audio visualization with more points for smoother animation
-        num_points = 150
+        num_points = 180  # Increased for smoother waves
         self.wave_points = []
         for i in range(num_points):
             x = i * (self.canvas_width / (num_points - 1))
@@ -356,7 +380,8 @@ class AnimatedDisplayWindow:
                 "amplitude": 0, 
                 "speed": 0.05 + random.random() * 0.15,
                 "phase": random.random() * math.pi * 2,  # Random phase offset
-                "frequency": 0.8 + random.random() * 0.4  # Random frequency
+                "frequency": 0.8 + random.random() * 0.4,  # Random frequency
+                "harmonic": random.random() * 0.5  # Additional harmonic component
             }
             self.wave_points.append(point)
         
@@ -454,24 +479,72 @@ class AnimatedDisplayWindow:
         for _ in range(self.max_particles // 2):  # Start with half the particles
             self._create_particle(center_x, center_y)
     
-    def _create_particle(self, x, y):
+    def _create_particle(self, x, y, particle_type="normal"):
         """
-        Create a new particle at the specified position.
+        Create a new particle at the specified position with specified type.
+        
+        Args:
+            x (float): X coordinate
+            y (float): Y coordinate
+            particle_type (str): Type of particle - "normal", "pulse", "trail", or "spark"
         """
         # Random angle and speed
         angle = random.random() * math.pi * 2
-        speed = random.uniform(*self.particle_speed_range)
-        size = random.uniform(*self.particle_size_range)
+        
+        # Adjust properties based on particle type
+        if particle_type == "normal":
+            speed = random.uniform(*self.particle_speed_range)
+            size = random.uniform(*self.particle_size_range)
+            lifetime = random.uniform(0.7, 1.0)
+            opacity = random.uniform(0.6, 1.0)
+            color = self.color_scheme["accent"]
+            shape = "oval"
+            
+        elif particle_type == "pulse":
+            # Pulsing particles that expand and contract
+            speed = random.uniform(*self.particle_speed_range) * 0.5  # Slower
+            size = random.uniform(*self.particle_size_range) * 1.5  # Larger
+            lifetime = random.uniform(0.8, 1.2)  # Longer lifetime
+            opacity = random.uniform(0.7, 0.9)
+            color = self.color_scheme["accent_glow"]
+            shape = "oval"
+            
+        elif particle_type == "trail":
+            # Trail particles that leave a path
+            speed = random.uniform(*self.particle_speed_range) * 1.5  # Faster
+            size = random.uniform(*self.particle_size_range) * 0.7  # Smaller
+            lifetime = random.uniform(0.5, 0.8)  # Shorter lifetime
+            opacity = random.uniform(0.4, 0.7)  # More transparent
+            color = self.color_scheme["accent_secondary"]
+            shape = "oval"
+            
+        elif particle_type == "spark":
+            # Spark particles that move erratically
+            speed = random.uniform(*self.particle_speed_range) * 2.0  # Much faster
+            size = random.uniform(1, 3)  # Very small
+            lifetime = random.uniform(0.3, 0.6)  # Very short lifetime
+            opacity = random.uniform(0.8, 1.0)  # More opaque
+            color = self.color_scheme["warning"]
+            shape = random.choice(["oval", "rect"])  # Different shapes
+        else:
+            # Default to normal
+            speed = random.uniform(*self.particle_speed_range)
+            size = random.uniform(*self.particle_size_range)
+            lifetime = random.uniform(0.7, 1.0)
+            opacity = random.uniform(0.6, 1.0)
+            color = self.color_scheme["accent"]
+            shape = "oval"
         
         # Calculate velocity based on angle and speed
         vx = math.cos(angle) * speed
         vy = math.sin(angle) * speed
         
-        # Random lifetime and opacity
-        lifetime = random.uniform(0.7, 1.0)
-        opacity = random.uniform(0.6, 1.0)
+        # Add some randomness to velocity for certain types
+        if particle_type == "spark":
+            vx += random.uniform(-0.5, 0.5)
+            vy += random.uniform(-0.5, 0.5)
         
-        # Create particle object
+        # Create particle object with additional properties
         particle = {
             "x": x,
             "y": y,
@@ -481,18 +554,31 @@ class AnimatedDisplayWindow:
             "lifetime": lifetime,
             "max_lifetime": lifetime,
             "opacity": opacity,
-            "color": self.color_scheme["accent"],
+            "color": color,
+            "type": particle_type,
+            "shape": shape,
+            "pulse_phase": random.random() * math.pi * 2,  # For pulsing particles
             "id": None  # Will be set when drawn
         }
         
-        # Draw particle on canvas
-        particle_id = self.canvas.create_oval(
-            x - size, y - size,
-            x + size, y + size,
-            fill=particle["color"],
-            outline="",
-            stipple="gray75"
-        )
+        # Draw particle on canvas based on shape
+        if shape == "oval":
+            particle_id = self.canvas.create_oval(
+                x - size, y - size,
+                x + size, y + size,
+                fill=particle["color"],
+                outline="",
+                stipple="gray75"
+            )
+        elif shape == "rect":
+            particle_id = self.canvas.create_rectangle(
+                x - size, y - size,
+                x + size, y + size,
+                fill=particle["color"],
+                outline="",
+                stipple="gray75"
+            )
+        
         particle["id"] = particle_id
         
         # Add to particles list
@@ -529,24 +615,52 @@ class AnimatedDisplayWindow:
             return
         
         # Update animation intensity based on state with smoother transitions
-        if self.animation_state == "idle":
-            target_intensity = 0.2
-            target_color = self.color_scheme["accent"]
-            target_glow = self.color_scheme["accent_glow"]
-            target_secondary = self.color_scheme["accent_secondary"]
-            particle_spawn_rate = 1  # Particles per frame
-        elif self.animation_state == "listening":
-            target_intensity = 0.7  # Increased from 0.6 for more activity
-            target_color = self.color_scheme["success"]
-            target_glow = "#00e060"  # Slightly darker green
-            target_secondary = "#80ffbb"  # Light green
-            particle_spawn_rate = 3  # More particles when listening
-        elif self.animation_state == "speaking":
-            target_intensity = 1.0
-            target_color = self.color_scheme["warning"]
-            target_glow = "#ff8000"  # Slightly darker orange
-            target_secondary = "#ffb366"  # Light orange
-            particle_spawn_rate = 5  # Most particles when speaking
+        # Define target values for each state
+        state_properties = {
+            "idle": {
+                "intensity": 0.2,
+                "color": self.color_scheme["accent"],
+                "glow": self.color_scheme["accent_glow"],
+                "secondary": self.color_scheme["accent_secondary"],
+                "spawn_rate": 1
+            },
+            "listening": {
+                "intensity": 0.7,  # Increased from 0.6 for more activity
+                "color": self.color_scheme["success"],
+                "glow": "#00e060",  # Slightly darker green
+                "secondary": "#80ffbb",  # Light green
+                "spawn_rate": 3
+            },
+            "speaking": {
+                "intensity": 1.0,
+                "color": self.color_scheme["warning"],
+                "glow": "#ff8000",  # Slightly darker orange
+                "secondary": "#ffb366",  # Light orange
+                "spawn_rate": 5
+            }
+        }
+        
+        # Get current and previous state properties
+        current_props = state_properties[self.animation_state]
+        prev_props = state_properties.get(getattr(self, 'previous_state', 'idle'), state_properties['idle'])
+        
+        # Calculate transition progress (0.0 to 1.0)
+        transition_progress = 0.0
+        if hasattr(self, 'transition_start_time') and hasattr(self, 'transition_duration'):
+            elapsed = time.time() - self.transition_start_time
+            transition_progress = min(1.0, elapsed / self.transition_duration)
+            
+            # Apply easing function for smoother transition (ease-out cubic)
+            transition_progress = 1 - (1 - transition_progress) ** 3
+        
+        # Interpolate between previous and current state values
+        target_intensity = prev_props["intensity"] + (current_props["intensity"] - prev_props["intensity"]) * transition_progress
+        particle_spawn_rate = round(prev_props["spawn_rate"] + (current_props["spawn_rate"] - prev_props["spawn_rate"]) * transition_progress)
+        
+        # Interpolate colors
+        target_color = self._interpolate_color(prev_props["color"], current_props["color"], transition_progress)
+        target_glow = self._interpolate_color(prev_props["glow"], current_props["glow"], transition_progress)
+        target_secondary = self._interpolate_color(prev_props["secondary"], current_props["secondary"], transition_progress)
         
         # Smoothly transition to target intensity with easing
         if self.animation_intensity < target_intensity:
@@ -622,6 +736,9 @@ class AnimatedDisplayWindow:
         )
         
         # Update all glow circles with different pulse rates
+        
+        # Update UI elements based on current state
+        self._update_ui_for_state()
         for i, glow_id in enumerate(self.glow_circles):
             # Different timing for each glow circle
             glow_pulse = math.sin(current_time * (1.5 - i * 0.3)) * self.animation_intensity
@@ -689,17 +806,85 @@ class AnimatedDisplayWindow:
         """
         Update particle positions and properties, and spawn new particles.
         """
-        # Spawn new particles based on animation state
+        # Spawn new particles based on animation state with enhanced behavior
         for _ in range(spawn_rate):
             if len(self.particles) < self.max_particles and random.random() < self.animation_intensity:
-                self._create_particle(center_x, center_y)
+                # Determine particle type based on animation state
+                if self.animation_state == "idle":
+                    particle_type = "normal"
+                elif self.animation_state == "listening":
+                    particle_type = random.choice(["normal", "pulse", "trail"])
+                elif self.animation_state == "speaking":
+                    particle_type = random.choice(["normal", "pulse", "trail", "spark"])
+                else:
+                    particle_type = "normal"
+                    
+                self._create_particle(center_x, center_y, particle_type)
         
-        # Update existing particles
+        # Update existing particles with enhanced behaviors
         particles_to_remove = []
         for particle in self.particles:
-            # Update position
-            particle["x"] += particle["vx"]
-            particle["y"] += particle["vy"]
+            # Get particle type
+            particle_type = particle.get("type", "normal")
+            
+            # Update position with type-specific behavior
+            if particle_type == "normal":
+                particle["x"] += particle["vx"]
+                particle["y"] += particle["vy"]
+            elif particle_type == "pulse":
+                # Pulsing particles move slower
+                particle["x"] += particle["vx"] * 0.8
+                particle["y"] += particle["vy"] * 0.8
+                # Add pulsing effect
+                particle["pulse_phase"] += 0.1
+            elif particle_type == "trail":
+                # Trail particles accelerate
+                particle["vx"] *= 1.01
+                particle["vy"] *= 1.01
+                particle["x"] += particle["vx"]
+                particle["y"] += particle["vy"]
+                # Create trail effect by spawning smaller particles
+                if random.random() < 0.2 and len(self.particles) < self.max_particles:
+                    trail_particle = {
+                        "x": particle["x"],
+                        "y": particle["y"],
+                        "vx": 0,
+                        "vy": 0,
+                        "size": particle["size"] * 0.5,
+                        "lifetime": particle["lifetime"] * 0.5,
+                        "max_lifetime": particle["lifetime"] * 0.5,
+                        "opacity": particle["opacity"] * 0.7,
+                        "color": particle["color"],
+                        "type": "normal",
+                        "shape": "oval",
+                        "id": None
+                    }
+                    # Draw trail particle
+                    trail_id = self.canvas.create_oval(
+                        trail_particle["x"] - trail_particle["size"], 
+                        trail_particle["y"] - trail_particle["size"],
+                        trail_particle["x"] + trail_particle["size"], 
+                        trail_particle["y"] + trail_particle["size"],
+                        fill=trail_particle["color"],
+                        outline="",
+                        stipple="gray50"
+                    )
+                    trail_particle["id"] = trail_id
+                    self.particles.append(trail_particle)
+            elif particle_type == "spark":
+                # Sparks move erratically
+                particle["vx"] += random.uniform(-0.2, 0.2)
+                particle["vy"] += random.uniform(-0.2, 0.2)
+                # Cap maximum velocity
+                max_vel = 3.0
+                particle["vx"] = max(-max_vel, min(max_vel, particle["vx"]))
+                particle["vy"] = max(-max_vel, min(max_vel, particle["vy"]))
+                particle["x"] += particle["vx"]
+                particle["y"] += particle["vy"]
+            else:
+                # Default behavior
+                particle["x"] += particle["vx"]
+                particle["y"] += particle["vy"]
             
             # Apply slight gravity effect
             particle["vy"] += 0.01
@@ -708,21 +893,52 @@ class AnimatedDisplayWindow:
             particle["vx"] *= 0.99
             particle["vy"] *= 0.99
             
-            # Decrease lifetime
-            particle["lifetime"] -= self.particle_fade_speed
+            # Update lifetime
+            if particle_type == "spark":
+                # Sparks fade faster
+                particle["lifetime"] -= self.particle_fade_speed * 1.5
+            else:
+                particle["lifetime"] -= self.particle_fade_speed
             
             # Calculate opacity based on lifetime
             opacity_ratio = particle["lifetime"] / particle["max_lifetime"]
-            current_size = particle["size"] * opacity_ratio
+            
+            # Calculate size with type-specific effects
+            if particle_type == "pulse":
+                # Pulsing size effect
+                pulse_factor = math.sin(particle["pulse_phase"]) * 0.3 + 0.7
+                current_size = particle["size"] * opacity_ratio * pulse_factor
+            elif particle_type == "spark":
+                # Sparks maintain size until they fade quickly
+                current_size = particle["size"] * (opacity_ratio ** 0.5)
+            else:
+                current_size = particle["size"] * opacity_ratio
             
             # Update particle on canvas
             if particle["lifetime"] > 0 and particle["id"] is not None:
-                # Update particle position and size
-                self.canvas.coords(
-                    particle["id"],
-                    particle["x"] - current_size, particle["y"] - current_size,
-                    particle["x"] + current_size, particle["y"] + current_size
-                )
+                # Update particle position and size based on shape
+                if particle.get("shape", "oval") == "oval":
+                    self.canvas.coords(
+                        particle["id"],
+                        particle["x"] - current_size, particle["y"] - current_size,
+                        particle["x"] + current_size, particle["y"] + current_size
+                    )
+                elif particle.get("shape", "oval") == "rect":
+                    # Rotate rectangles slightly for more dynamic effect
+                    rotation = time.time() * 50 % 360
+                    if rotation > 45 and rotation < 135:
+                        # Make rectangle taller when rotated
+                        self.canvas.coords(
+                            particle["id"],
+                            particle["x"] - current_size * 0.7, particle["y"] - current_size * 1.3,
+                            particle["x"] + current_size * 0.7, particle["y"] + current_size * 1.3
+                        )
+                    else:
+                        self.canvas.coords(
+                            particle["id"],
+                            particle["x"] - current_size, particle["y"] - current_size,
+                            particle["x"] + current_size, particle["y"] + current_size
+                        )
                 
                 # Update color based on animation state
                 if self.animation_state == "idle":
@@ -731,6 +947,12 @@ class AnimatedDisplayWindow:
                     color = self.color_scheme["success"]
                 elif self.animation_state == "speaking":
                     color = self.color_scheme["warning"]
+                
+                # Update color for certain particle types
+                if particle_type == "spark" and random.random() < 0.2:
+                    # Sparks can change color randomly for flickering effect
+                    colors = [self.color_scheme["warning"], self.color_scheme["accent"], self.color_scheme["accent_secondary"]]
+                    color = random.choice(colors)
                 
                 self.canvas.itemconfig(particle["id"], fill=color)
                 
@@ -889,75 +1111,100 @@ class AnimatedDisplayWindow:
     
     def display(self, text):
         """
-        Add a response to the display queue and trigger speaking animation.
+        Add a response to the display queue with enhanced visual feedback.
         
         Args:
             text (str): The text to display
         """
         if self.is_running:
-            self.response_queue.put(text)
+            # Split text into chunks for animated typing effect
+            words = text.split()
+            total_words = len(words)
+            
+            # Set animation state to speaking with immediate visual feedback
             self.set_animation_state("speaking")
-            # Schedule return to idle state after a delay
+            
+            # Add text to queue for display
+            self.response_queue.put(text)
+            
+            # Calculate appropriate delay based on text length
+            # Minimum 3 seconds, plus 0.1 second per word
+            display_duration = max(3.0, 3.0 + (total_words * 0.1))
+            
+            # Reset to idle after text has been displayed
             if self.root:
-                self.root.after(5000, lambda: self.set_animation_state("idle"))
+                self.root.after(int(display_duration * 1000), lambda: self.set_animation_state("idle"))
     
     def set_animation_state(self, state):
         """
-        Set the current animation state with visual feedback.
+        Set the current animation state with enhanced visual feedback.
+        Thread-safe implementation that works from any thread.
         
         Args:
             state (str): One of 'idle', 'listening', or 'speaking'
         """
-        # Store previous state for transition effects
-        previous_state = self.animation_state
+        # Only process if state is actually changing
+        if hasattr(self, 'animation_state') and self.animation_state == state:
+            return
+            
+        # Store the previous state for transition effects
+        self.previous_state = self.animation_state if hasattr(self, 'animation_state') else 'idle'
+        
+        # Store the state change - animation loop will pick this up
         self.animation_state = state
         
-        # Update status indicator with enhanced visual feedback
+        # Store transition start time for smooth transitions
+        self.transition_start_time = time.time()
+        self.transition_duration = 0.5  # seconds
+        
+        # Schedule creation of ripple effect in main thread
+        if self.is_running and self.root:
+            self.root.after(0, self._create_state_change_effect)
+        
+        # No direct UI updates here - they'll be handled in the main thread
+        # through the animation loop which already runs on the main thread
+    
+    def _update_ui_for_state(self):
+        """
+        Update UI elements based on current animation state.
+        This is called from the animation loop which runs on the main thread.
+        """
+        if not self.is_running or not self.root:
+            return
+            
+        # Get current state
+        state = self.animation_state
+            
+        # Define status colors and text based on state
+        if state == "idle":
+            status_text = "● IDLE"
+            status_color = self.color_scheme["text_dim"]
+            status_font = ("Segoe UI", 11, "bold")
+            footer_text = "⚡ System Ready"
+        elif state == "listening":
+            status_text = "● LISTENING"
+            status_color = self.color_scheme["success"]
+            status_font = ("Segoe UI", 11, "bold")
+            footer_text = "🎤 Listening..."
+        elif state == "speaking":
+            status_text = "● SPEAKING"
+            status_color = self.color_scheme["warning"]
+            status_font = ("Segoe UI", 11, "bold")
+            footer_text = "💬 Speaking..."
+        
+        # Update status indicator
         if hasattr(self, 'status_indicator') and self.status_indicator:
-            # Define status colors and text based on state
-            if state == "idle":
-                status_text = "● IDLE"
-                status_color = self.color_scheme["text_dim"]
-                status_font = ("Segoe UI", 11, "bold")
-            elif state == "listening":
-                status_text = "● LISTENING"
-                status_color = self.color_scheme["success"]
-                status_font = ("Segoe UI", 11, "bold")
-            elif state == "speaking":
-                status_text = "● SPEAKING"
-                status_color = self.color_scheme["warning"]
-                status_font = ("Segoe UI", 11, "bold")
-            
-            # Apply the new status with a brief highlight effect
-            self.status_indicator.config(text=status_text, fg=status_color, font=status_font)
-            
-            # Create a flash effect when changing states
-            if previous_state != state and self.root:
-                # Flash effect - briefly highlight with brighter color
-                original_bg = self.status_indicator.cget("background")
-                self.status_indicator.config(background=status_color)
+            try:
+                self.status_indicator.config(text=status_text, fg=status_color, font=status_font)
+            except Exception:
+                pass  # Ignore errors if widget is being destroyed
                 
-                # Schedule return to normal background
-                self.root.after(150, lambda: self.status_indicator.config(background=original_bg))
-                
-                # Create particles burst effect on state change
-                if hasattr(self, 'canvas') and self.canvas:
-                    # Get canvas center
-                    center_x = self.canvas_width / 2
-                    center_y = self.canvas_height / 2
-                    
-                    # Create a burst of particles
-                    for _ in range(15):
-                        self._create_particle(center_x, center_y)
-                        
-            # Update footer text based on state
-            if hasattr(self, 'footer_text') and self.footer_text:
-                if state == "idle":
-                    self.footer_text.config(text="⚡ System Ready")
-                elif state == "listening":
-                    self.footer_text.config(text="🎤 Listening...")
-                elif state == "speaking":
-                    self.footer_text.config(text="💬 Speaking...")
+        # Update footer text
+        if hasattr(self, 'footer_text') and self.footer_text:
+            try:
+                self.footer_text.config(text=footer_text)
+            except Exception:
+                pass  # Ignore errors if widget is being destroyed
 
     
     def stop(self):
