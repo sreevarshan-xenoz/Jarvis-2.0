@@ -363,54 +363,42 @@ class AnimatedDisplayWindow:
         """
         Initialize the animation elements.
         """
-        # Get canvas dimensions
-        self.canvas_width = self.canvas.winfo_reqwidth()
-        self.canvas_height = self.canvas.winfo_reqheight()
-        
-        # Create wave points for the audio visualization with more points for smoother animation
-        num_points = 180  # Increased for smoother waves
-        self.wave_points = []
-        for i in range(num_points):
-            x = i * (self.canvas_width / (num_points - 1))
-            y = self.canvas_height / 2
-            # Add more randomness to wave properties for more natural look
-            point = {
-                "x": x, 
-                "y": y, 
-                "amplitude": 0, 
-                "speed": 0.05 + random.random() * 0.15,
-                "phase": random.random() * math.pi * 2,  # Random phase offset
-                "frequency": 0.8 + random.random() * 0.4,  # Random frequency
-                "harmonic": random.random() * 0.5  # Additional harmonic component
-            }
-            self.wave_points.append(point)
-        
-        # Create multiple wave lines for layered effect
-        self.wave_lines = []
-        
-        # Main wave line - disabled to remove line near mouse pointer
-        # self.wave_line = self.canvas.create_line(
-        #     [p["x"] for p in self.wave_points], 
-        #     [p["y"] for p in self.wave_points],
-        #     fill=self.color_scheme["accent"],
-        #     width=2.5,
-        #     smooth=True,
-        #     capstyle=tk.ROUND,
-        #     joinstyle=tk.ROUND
-        # )
-        # self.wave_lines.append(self.wave_line)
-        
-        # Secondary wave lines - disabled to remove line near mouse pointer
-        # secondary_line = self.canvas.create_line(
-        #     [p["x"] for p in self.wave_points], 
-        #     [p["y"] for p in self.wave_points],
-        #     fill=self.color_scheme["accent_secondary"],
-        #     width=1.5,
-        #     smooth=True,
-        #     capstyle=tk.ROUND,
-        #     joinstyle=tk.ROUND
-        # )
-        # self.wave_lines.append(secondary_line)
+        try:
+            # Get canvas dimensions
+            if not self.canvas:
+                return
+                
+            self.canvas_width = self.canvas.winfo_reqwidth() or 900
+            self.canvas_height = self.canvas.winfo_reqheight() or 220
+            
+            # Create wave points for the audio visualization with more points for smoother animation
+            num_points = 180  # Increased for smoother waves
+            self.wave_points = []
+            for i in range(num_points):
+                x = i * (self.canvas_width / (num_points - 1))
+                y = self.canvas_height / 2
+                # Add more randomness to wave properties for more natural look
+                point = {
+                    "x": x, 
+                    "y": y, 
+                    "amplitude": 0, 
+                    "speed": 0.05 + random.random() * 0.15,
+                    "phase": random.random() * math.pi * 2,  # Random phase offset
+                    "frequency": 0.8 + random.random() * 0.4,  # Random frequency
+                    "harmonic": random.random() * 0.5  # Additional harmonic component
+                }
+                self.wave_points.append(point)
+            
+            # Create empty wave_lines list but don't create any actual lines
+            # This removes the lines near the mouse pointer as requested
+            self.wave_lines = []
+            
+            # No wave lines will be created - they've been removed as requested
+        except Exception as e:
+            print(f"Error initializing animation: {e}")
+            # Create empty lists to prevent errors
+            self.wave_points = []
+            self.wave_lines = []
         
         # Create central circle with gradient fill
         center_x = self.canvas_width / 2
@@ -736,12 +724,13 @@ class AnimatedDisplayWindow:
         self._update_particles(center_x, center_y, particle_spawn_rate)
         
         # Update colors based on state with smooth transitions
-        # For each wave line
-        for i, line_id in enumerate(self.wave_lines):
-            if i == 0:  # Main line
-                self.canvas.itemconfig(line_id, fill=target_color)
-            else:  # Secondary lines
-                self.canvas.itemconfig(line_id, fill=target_secondary)
+        # For each wave line - only if wave lines exist
+        if self.wave_lines:  # Only process if there are wave lines
+            for i, line_id in enumerate(self.wave_lines):
+                if i == 0:  # Main line
+                    self.canvas.itemconfig(line_id, fill=target_color)
+                else:  # Secondary lines
+                    self.canvas.itemconfig(line_id, fill=target_secondary)
         
         # Update circle colors
         self.canvas.itemconfig(self.center_circle, outline=target_color)
@@ -1072,7 +1061,10 @@ class AnimatedDisplayWindow:
         Args:
             text (str): The text to display
         """
-        if self.is_running:
+        if not self.is_running:
+            return
+            
+        try:
             # Split text into chunks for animated typing effect
             words = text.split()
             total_words = len(words)
@@ -1090,6 +1082,14 @@ class AnimatedDisplayWindow:
             # Reset to idle after text has been displayed
             if self.root:
                 self.root.after(int(display_duration * 1000), lambda: self.set_animation_state("idle"))
+        except Exception as e:
+            # Log error but don't crash
+            print(f"Error displaying text: {e}")
+            # Try to add text to queue directly as a fallback
+            try:
+                self.response_queue.put(text)
+            except:
+                pass
     
     def set_animation_state(self, state):
         """
@@ -1099,7 +1099,7 @@ class AnimatedDisplayWindow:
         Args:
             state (str): One of 'idle', 'listening', or 'speaking'
         """
-        # Only process if state is actually changing
+        # Only process if state is actually changing or if animation_state doesn't exist yet
         if hasattr(self, 'animation_state') and self.animation_state == state:
             return
             
@@ -1128,7 +1128,10 @@ class AnimatedDisplayWindow:
         if not self.is_running or not self.root:
             return
             
-        # Get current state
+        # Get current state - ensure it exists
+        if not hasattr(self, 'animation_state'):
+            return
+            
         state = self.animation_state
             
         # Define status colors and text based on state
@@ -1147,6 +1150,12 @@ class AnimatedDisplayWindow:
             status_color = self.color_scheme["warning"]
             status_font = ("Segoe UI", 11, "bold")
             footer_text = "💬 Speaking..."
+        else:
+            # Default values for unknown state
+            status_text = "● SYSTEM"
+            status_color = self.color_scheme["text_dim"]
+            status_font = ("Segoe UI", 11, "bold")
+            footer_text = "⚡ System Ready"
         
         # Update status indicator with smooth transition effect
         if hasattr(self, 'status_indicator') and self.status_indicator:
@@ -1157,8 +1166,9 @@ class AnimatedDisplayWindow:
                 # Then animate color change
                 current_color = self.status_indicator.cget("foreground")
                 self._animate_color_change(self.status_indicator, current_color, status_color, "foreground", 300)
-            except Exception:
-                pass  # Ignore errors if widget is being destroyed
+            except Exception as e:
+                # Just continue if there's an error with the widget
+                pass
                 
         # Update footer text with animation
         if hasattr(self, 'footer_text') and self.footer_text:
@@ -1174,7 +1184,8 @@ class AnimatedDisplayWindow:
                 else:
                     self.footer_text.config(text=footer_text)
             except Exception:
-                pass  # Ignore errors if widget is being destroyed
+                # Just continue if there's an error with the widget
+                pass
     
     def _create_state_change_effect(self):
         """
