@@ -7,7 +7,7 @@ This module handles speech recognition and text-to-speech functionality.
 
 import speech_recognition as sr
 import pyttsx3
-from core.display import DisplayWindow
+from core.animated_display import AnimatedDisplayWindow
 
 class SpeechEngine:
     """
@@ -26,8 +26,8 @@ class SpeechEngine:
         voices = self.engine.getProperty('voices')
         self.engine.setProperty('voice', voices[0].id)  # Default to male voice
         
-        # Initialize display window
-        self.display_window = DisplayWindow()
+        # Initialize animated display window
+        self.display_window = AnimatedDisplayWindow()
         self.display_window.start()
     
     def speak(self, text):
@@ -42,7 +42,7 @@ class SpeechEngine:
         print(f"🤖 JARVIS: {text}")
         print("="*50 + "\n")
         
-        # Display text in GUI window
+        # Display text in animated GUI window
         self.display_window.display(text)
         
         # Convert to speech
@@ -64,9 +64,13 @@ class SpeechEngine:
             with sr.Microphone() as source:
                 self.recognizer.adjust_for_ambient_noise(source, duration=1)
                 print('Listening...')
+                # Update animation state to listening
+                self.display_window.set_animation_state("listening")
                 voice = self.recognizer.listen(source, timeout=timeout)
                 command = self.recognizer.recognize_google(voice).lower()
                 print(f"Recognized: {command}")
+                # Set animation state back to idle after recognition
+                self.display_window.set_animation_state("idle")
         except (sr.UnknownValueError, sr.WaitTimeoutError):
             pass  # Nothing recognized or timeout
         except sr.RequestError as e:

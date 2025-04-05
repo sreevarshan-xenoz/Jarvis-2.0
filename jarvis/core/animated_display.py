@@ -13,8 +13,9 @@ import queue
 import math
 import random
 import time
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 import numpy as np
+from tkinter import ttk  # For modern themed widgets
 
 class AnimatedDisplayWindow:
     """
@@ -372,8 +373,8 @@ class AnimatedDisplayWindow:
         """
         self.animation_state = state
         
-        # Update status indicator
-        if self.status_indicator:
+        # Update status indicator if it exists and window is fully initialized
+        if hasattr(self, 'status_indicator') and self.status_indicator:
             if state == "idle":
                 self.status_indicator.config(text="● IDLE", fg=self.color_scheme["text_dim"])
             elif state == "listening":
