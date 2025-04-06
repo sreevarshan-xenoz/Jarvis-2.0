@@ -46,12 +46,31 @@ The animated UI requires the following dependencies (included in requirements.tx
 
 ## Future Enhancements
 
-Possible future improvements:
+Planned future improvements to enhance the visual experience:
 
-- Audio spectrum visualization using FFT
-- Particle effects for more dynamic animations
-- 3D rendering options using PyOpenGL
-- Customizable themes and animation styles
+### Audio Spectrum Visualization
+- Real-time FFT (Fast Fourier Transform) analysis of audio input
+- Frequency-based visualization that shows actual voice patterns
+- Color-coded frequency bands for bass, mid, and treble ranges
+- Responsive visualization that accurately represents voice intensity and pitch
+
+### Enhanced Particle System
+- Physics-based particle interactions with collision detection
+- Particle trails and life cycle effects (birth, growth, decay)
+- Reactive particle bursts based on voice command keywords
+- Particle flow fields that respond to directional audio input
+
+### 3D Rendering with PyOpenGL
+- Transition from 2D canvas to 3D rendered environment
+- Depth-based visualizations with perspective and lighting
+- Interactive 3D elements that respond to voice commands
+- Hardware-accelerated animations for smoother performance
+
+### Customizable Themes and Styles
+- User-selectable color schemes and visual styles
+- Theme presets (Dark, Light, High Contrast, Cyberpunk, Minimal)
+- Adjustable animation intensity and complexity settings
+- Custom animation behavior profiles for different use cases
 
 ## Usage
 

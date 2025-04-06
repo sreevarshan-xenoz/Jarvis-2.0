@@ -15,8 +15,13 @@ tkinter>=8.6  # Usually comes with Python installation
 pillow>=9.0.0  # For image processing
 numpy>=1.22.0  # For numerical operations in animations
 
-# For advanced animations (optional but recommended)
-pygame>=2.1.2  # For more complex animations and sound visualization
+# For advanced animations and audio visualization
+pygame>=2.1.2  # For complex animations and sound visualization
+pyaudio>=0.2.11  # For audio input processing
+
+# For 3D rendering
+pyopengl>=3.1.6  # For 3D rendering with OpenGL
+pyopengl-accelerate>=3.1.6  # For hardware acceleration
 
 # LLM integration
 ollama>=0.1.0  # For local LLM integration

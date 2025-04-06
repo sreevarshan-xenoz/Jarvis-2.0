@@ -9,8 +9,9 @@ import speech_recognition as sr
 import pyttsx3
 import threading
 import queue
+import time
 from config.settings import WAKE_WORDS
-from core.animated_display import AnimatedDisplayWindow
+from core.display_factory import create_display
 
 class SpeechEngine:
     """
@@ -29,8 +30,8 @@ class SpeechEngine:
         voices = self.engine.getProperty('voices')
         self.engine.setProperty('voice', voices[0].id)  # Default to male voice
         
-        # Initialize animated display window
-        self.display_window = AnimatedDisplayWindow()
+        # Initialize display window with enhanced features
+        self.display_window = create_display(use_enhanced=True)
         self.display_window.start()
         
         # Interruption handling
@@ -140,7 +141,13 @@ class SpeechEngine:
         
         # Clean up
         self.speaking = False
-        self.engine.disconnect('started-word')
+        # Fix disconnect method - it expects a handler function, not a string
+        try:
+            self.engine.disconnect(on_word)
+        except Exception as e:
+            print(f"Warning: Could not disconnect event handler: {e}")
+            # Fallback: Create a new engine instance if needed
+            # self.engine = pyttsx3.init()
         
         # If interrupted, return to listening state
         if self.should_interrupt:
