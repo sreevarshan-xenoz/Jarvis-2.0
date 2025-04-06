@@ -132,8 +132,8 @@ class SpeechEngine:
                 return False  # Stop speech
             return True
         
-        # Connect callback
-        self.engine.connect('started-word', on_word)
+        # Store the connection token for proper disconnection
+        connection_token = self.engine.connect('started-word', on_word)
         
         # Say the text
         self.engine.say(text)
@@ -141,9 +141,9 @@ class SpeechEngine:
         
         # Clean up
         self.speaking = False
-        # Fix disconnect method - it expects a handler function, not a string
+        # Properly disconnect using the connection token
         try:
-            self.engine.disconnect(on_word)
+            self.engine.disconnect(connection_token)
         except Exception as e:
             print(f"Warning: Could not disconnect event handler: {e}")
             # Fallback: Create a new engine instance if needed
