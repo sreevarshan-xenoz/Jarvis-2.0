@@ -7,6 +7,7 @@ This module extends the original animated display with advanced features:
 - Enhanced particle system with physics-based interactions
 - 3D rendering with PyOpenGL
 - Customizable themes and styles
+- Personality traits for friendly and personable interactions
 """
 
 import tkinter as tk
@@ -25,10 +26,13 @@ from core.animated_display import AnimatedDisplayWindow
 
 # Import enhanced features
 from core.ui_integrator import UIIntegrator
+from core.personality_traits import PersonalityTraits
+import math  # Required for animation functions
 
 class EnhancedAnimatedDisplayWindow(AnimatedDisplayWindow):
     """
     Enhanced version of the AnimatedDisplayWindow with advanced visualization features.
+    Includes personality traits for more friendly and personable interactions.
     """
     
     def __init__(self):
@@ -42,6 +46,10 @@ class EnhancedAnimatedDisplayWindow(AnimatedDisplayWindow):
         self.ui_integrator = None
         self.enhanced_objects = []
         self.using_enhanced_features = True
+        
+        # Initialize personality traits
+        self.personality = None
+        self.friendly_mode = True  # Enable friendly animations by default
     
     def _create_window(self):
         """
@@ -98,6 +106,15 @@ class EnhancedAnimatedDisplayWindow(AnimatedDisplayWindow):
         if not self.ui_integrator:
             self.ui_integrator = UIIntegrator(self)
             self.ui_integrator.initialize()
+            
+        # Initialize personality traits
+        if not self.personality and self.friendly_mode:
+            # Pass the particle system if available
+            particle_system = None
+            if hasattr(self.ui_integrator, 'particle_system'):
+                particle_system = self.ui_integrator.particle_system
+                
+            self.personality = PersonalityTraits(particle_system)
     
     def _animate(self):
         """
@@ -183,10 +200,17 @@ class EnhancedAnimatedDisplayWindow(AnimatedDisplayWindow):
                     self.ui_integrator.particle_system.create_keyword_burst(
                         center_x, center_y, 'listening', self.color_scheme['success']
                     )
+                    # Add emoji reaction for listening state
+                    if hasattr(self.ui_integrator.particle_system, 'create_reaction'):
+                        self.ui_integrator.particle_system.create_reaction(center_x, center_y, 'listening')
+                        
                 elif state == 'speaking' and self.previous_state != 'speaking':
                     self.ui_integrator.particle_system.create_keyword_burst(
                         center_x, center_y, 'speaking', self.color_scheme['warning']
                     )
+                    # Add emoji reaction for speaking state
+                    if hasattr(self.ui_integrator.particle_system, 'create_reaction'):
+                        self.ui_integrator.particle_system.create_reaction(center_x, center_y, 'speaking')
     
     def stop(self):
         """

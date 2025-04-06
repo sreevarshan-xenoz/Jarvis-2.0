@@ -7,6 +7,7 @@ This module processes and executes different voice commands.
 
 import datetime
 import re
+import random
 
 from services.weather import WeatherService
 from services.news import NewsService
@@ -57,7 +58,13 @@ class CommandHandler:
         # Time commands
         elif 'time' in command:
             time = datetime.datetime.now().strftime('%I:%M %p')
-            self.speech_engine.speak(f'Current time is {time}')
+            friendly_time_responses = [
+                f"It's currently {time}. Time flies when you're having fun! ⏰",
+                f"The time is {time}. Carpe diem! ⌚",
+                f"Look at that, it's already {time}! Where does the day go? 🕒",
+                f"It's {time} right now. Always good to stay on schedule! 📅"
+            ]
+            self.speech_engine.speak(random.choice(friendly_time_responses))
         
         # Wikipedia commands
         elif 'who is' in command:
@@ -68,13 +75,39 @@ class CommandHandler:
         # Joke commands
         elif 'joke' in command:
             joke = self.llm_service.get_joke()
-            self.speech_engine.speak(joke)
+            joke_intros = [
+                "Here's one that'll make you smile! 😄 ",
+                "I've been saving this one! 😆 ",
+                "This one cracks me up every time! 😂 ",
+                "Let me brighten your day with this! 🤣 "
+            ]
+            self.speech_engine.speak(random.choice(joke_intros) + joke)
+            
+            # If using enhanced display, trigger joke reaction
+            if hasattr(self.speech_engine.display_window, 'ui_integrator') and \
+               hasattr(self.speech_engine.display_window.ui_integrator, 'particle_system'):
+                try:
+                    center_x = self.speech_engine.display_window.canvas_width / 2
+                    center_y = self.speech_engine.display_window.canvas_height / 2
+                    self.speech_engine.display_window.ui_integrator.particle_system.create_reaction(
+                        center_x, center_y, 'joke'
+                    )
+                except Exception as e:
+                    print(f"Error creating joke reaction: {e}")
         
         # Weather commands
         elif 'weather' in command:
             city = command.replace('weather', '').strip() or 'new york'
             weather_report = self.weather_service.get_weather(city)
-            self.speech_engine.speak(weather_report)
+            
+            # Add friendly intros to weather reports
+            weather_intros = [
+                f"Let me check that for you! {weather_report} ☀️",
+                f"Here's your forecast, friend! {weather_report} 🌤️",
+                f"Weather update coming right up! {weather_report} 🌈",
+                f"I hope you're dressed for this! {weather_report} 🌦️"
+            ]
+            self.speech_engine.speak(random.choice(weather_intros))
         
         # News commands
         elif 'news' in command:
@@ -84,11 +117,23 @@ class CommandHandler:
         # Volume commands
         elif 'volume up' in command:
             self.system_service.volume_up()
-            self.speech_engine.speak('Increasing volume')
+            volume_up_responses = [
+                "Pumping up the volume for you! 🔊",
+                "Turning it up! Rock on! 🎸",
+                "Volume increased! Can you hear me better now? 👂",
+                "Louder and clearer! How's that? 🔉→🔊"
+            ]
+            self.speech_engine.speak(random.choice(volume_up_responses))
         
         elif 'volume down' in command:
             self.system_service.volume_down()
-            self.speech_engine.speak('Decreasing volume')
+            volume_down_responses = [
+                "Lowering the volume for you. Getting too loud? 🔉",
+                "Volume decreased! Going for that calm vibe! 😌",
+                "Turning it down a notch! Better? 🔊→🔉",
+                "Volume reduced! Let me know if you need it quieter! 🤫"
+            ]
+            self.speech_engine.speak(random.choice(volume_down_responses))
         
         # Web search commands
         elif re.search(r'search (for|on)\s+', command) or command.startswith('search '):
@@ -104,10 +149,21 @@ class CommandHandler:
             
             if query:
                 engine_text = f" on {engine}" if engine else ""
-                self.speech_engine.speak(f"Searching{engine_text} for {query}")
+                friendly_responses = [
+                    f"I'm on it! Searching{engine_text} for {query} right now! 🔍",
+                    f"Let me find that for you! Searching{engine_text} for {query} 👀",
+                    f"Detective Jarvis is on the case! Looking up {query}{engine_text} 🕵️",
+                    f"Searching{engine_text} for {query}. This should be interesting! ✨"
+                ]
+                self.speech_engine.speak(random.choice(friendly_responses))
                 self.web_search_service.search(query, engine)
             else:
-                self.speech_engine.speak("What would you like me to search for?")
+                friendly_questions = [
+                    "What would you like me to search for? I'm all ears! 👂",
+                    "I'd be happy to search for something! What are you curious about? 🤔",
+                    "Ready to search! Just tell me what you're looking for! 🔍"
+                ]
+                self.speech_engine.speak(random.choice(friendly_questions))
         
         # Close application commands
         elif re.search(r'close|exit|quit', command) and not (command == 'exit' or command == 'quit' or 'goodbye' in command):
@@ -148,10 +204,40 @@ class CommandHandler:
         
         # Exit commands
         elif 'exit' in command or 'goodbye' in command:
-            self.speech_engine.speak("Goodbye!")
+            farewell_messages = [
+                "Goodbye, friend! Have a wonderful day! 👋",
+                "See you later! I'll be here when you need me! 😊",
+                "Farewell! It was great chatting with you! ✨",
+                "Until next time! Take care of yourself! 🌟"
+            ]
+            self.speech_engine.speak(random.choice(farewell_messages))
             exit()
         
         # Default: Ask LLM
         else:
             response = self.llm_service.ask(command)
+            
+            # Add friendly intros occasionally to make responses more personable
+            if random.random() < 0.3:  # 30% chance to add a friendly intro
+                friendly_intros = [
+                    "Happy to help! ",
+                    "Great question! ",
+                    "I'd love to answer that! ",
+                    "Let me think about that... ",
+                    "That's an interesting one! "
+                ]
+                response = random.choice(friendly_intros) + response
+            
             self.speech_engine.speak(response)
+            
+            # If using enhanced display, trigger a thinking reaction
+            if hasattr(self.speech_engine.display_window, 'ui_integrator') and \
+               hasattr(self.speech_engine.display_window.ui_integrator, 'particle_system'):
+                try:
+                    center_x = self.speech_engine.display_window.canvas_width / 2
+                    center_y = self.speech_engine.display_window.canvas_height / 2
+                    self.speech_engine.display_window.ui_integrator.particle_system.create_reaction(
+                        center_x, center_y, 'thinking'
+                    )
+                except Exception as e:
+                    print(f"Error creating thinking reaction: {e}")

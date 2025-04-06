@@ -669,6 +669,9 @@ class ParticleSystem:
         # Update flow field
         self.update_flow_field()
         
+        # Update emoji particles
+        self.update_emoji_particles(dt)
+        
         # Determine spawn rate based on animation state and intensity
         spawn_rate = 0
         if animation_state == 'idle':
