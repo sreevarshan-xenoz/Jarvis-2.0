@@ -145,3 +145,14 @@ class DisplayWindow:
         if self.root:
             self.root.quit()
             self.root.destroy()
+            
+    def set_animation_state(self, state):
+        """
+        Set the animation state (compatibility method for non-animated display).
+        
+        Args:
+            state (str): Animation state ('idle', 'listening', 'speaking', or 'conversation')
+        """
+        # This is a stub method for compatibility with AnimatedDisplayWindow
+        # No animation state changes in the basic display
+        pass

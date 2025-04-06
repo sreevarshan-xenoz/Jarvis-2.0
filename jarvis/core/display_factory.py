@@ -8,7 +8,8 @@ based on configuration and available features.
 
 # Import display options
 from core.display import DisplayWindow
-from core.animated_display import AnimatedDisplayWindow
+from core.animated_display import AnimatedDisplayWindow as AnimatedDisplay
+
 
 def create_display(use_animated=True):
     """
@@ -20,4 +21,7 @@ def create_display(use_animated=True):
     Returns:
         DisplayWindow: The created display window instance
     """
-    return AnimatedDisplayWindow() if use_animated else DisplayWindow()
+    if use_animated:
+        return AnimatedDisplay()
+    else:
+        return DisplayWindow()
