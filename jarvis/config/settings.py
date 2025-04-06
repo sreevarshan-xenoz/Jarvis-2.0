@@ -35,5 +35,7 @@ WEBSITES = {
 # System settings
 VOLUME_STEP = 2000  # Volume change step for NirCmd
 
-# Conversation history settings
+# Conversation settings
 MAX_HISTORY_LENGTH = 5  # Maximum number of conversation turns to remember
+CONVERSATION_TIMEOUT = 30  # Seconds to keep conversation active after last interaction
+CONTINUOUS_MODE = True  # Enable continuous conversation mode without wake word

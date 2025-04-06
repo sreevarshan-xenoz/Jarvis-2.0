@@ -8,7 +8,8 @@ all the voice assistant's functionality.
 
 from core.speech import SpeechEngine
 from core.command_handler import CommandHandler
-from config.settings import WAKE_WORDS
+from config.settings import WAKE_WORDS, CONVERSATION_TIMEOUT, CONTINUOUS_MODE
+import time
 
 class JarvisAssistant:
     """
@@ -23,6 +24,8 @@ class JarvisAssistant:
         self.speech_engine = SpeechEngine()
         self.command_handler = CommandHandler(self.speech_engine)
         self.is_active = False
+        self.conversation_active = False
+        self.last_interaction_time = 0
         
     def detect_wake_word(self, command):
         """
@@ -44,22 +47,46 @@ class JarvisAssistant:
         self.speech_engine.speak("Jarvis activated. How can I assist you?")
         
         while self.is_active:
-            command = self.speech_engine.listen()
+            # Check if conversation has timed out
+            if self.conversation_active and time.time() - self.last_interaction_time > CONVERSATION_TIMEOUT:
+                self.conversation_active = False
+                self.speech_engine.display_window.set_animation_state("idle")
+            
+            # Adjust listen timeout based on conversation state
+            listen_timeout = 3 if self.conversation_active else 5
+            command = self.speech_engine.listen(timeout=listen_timeout)
             
             if not command:
                 continue
+            
+            # Process command based on conversation state
+            if self.detect_wake_word(command) or self.conversation_active:
+                # Update conversation state
+                self.conversation_active = True
+                self.last_interaction_time = time.time()
                 
-            if self.detect_wake_word(command):
-                # Extract the actual command after the wake word
-                actual_command = command.split(' ', 1)[1] if ' ' in command else ""
+                # Set animation state to conversation active
+                self.speech_engine.display_window.set_animation_state("conversation")
+                
+                # Extract the actual command after the wake word if needed
+                if self.detect_wake_word(command) and not CONTINUOUS_MODE:
+                    actual_command = command.split(' ', 1)[1] if ' ' in command else ""
+                else:
+                    actual_command = command
                 
                 if actual_command:
+                    # Set animation state to speaking before processing command
+                    self.speech_engine.display_window.set_animation_state("speaking")
                     self.command_handler.process_command(actual_command)
+                    # Keep conversation active after command processing
+                    self.last_interaction_time = time.time()
                 else:
                     self.speech_engine.speak("Yes? I'm listening...")
                     follow_up_command = self.speech_engine.listen()
                     if follow_up_command:
                         self.command_handler.process_command(follow_up_command)
+                        # Keep conversation active after command processing
+                        self.last_interaction_time = time.time()
     
     def stop(self):
         """

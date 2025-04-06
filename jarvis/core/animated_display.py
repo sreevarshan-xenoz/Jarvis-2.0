@@ -1150,6 +1150,11 @@ class AnimatedDisplayWindow:
             status_color = self.color_scheme["warning"]
             status_font = ("Segoe UI", 11, "bold")
             footer_text = "💬 Speaking..."
+        elif state == "conversation":
+            status_text = "● ACTIVE"
+            status_color = self.color_scheme["accent"]
+            status_font = ("Segoe UI", 11, "bold")
+            footer_text = "🗣️ Conversation Active"
         else:
             # Default values for unknown state
             status_text = "● SYSTEM"

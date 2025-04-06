@@ -42,6 +42,9 @@ class SpeechEngine:
         print(f"🤖 JARVIS: {text}")
         print("="*50 + "\n")
         
+        # Set animation state to speaking
+        self.display_window.set_animation_state("speaking")
+        
         # Display text in animated GUI window
         self.display_window.display(text)
         
@@ -65,12 +68,18 @@ class SpeechEngine:
                 self.recognizer.adjust_for_ambient_noise(source, duration=1)
                 print('Listening...')
                 # Update animation state to listening
-                self.display_window.set_animation_state("listening")
+                # Don't change state if already in conversation mode
+                current_state = getattr(self.display_window, 'animation_state', 'idle')
+                if current_state != "conversation":
+                    self.display_window.set_animation_state("listening")
+                
                 voice = self.recognizer.listen(source, timeout=timeout)
                 command = self.recognizer.recognize_google(voice).lower()
                 print(f"Recognized: {command}")
-                # Set animation state back to idle after recognition
-                self.display_window.set_animation_state("idle")
+                
+                # Only set back to idle if we're not in conversation mode
+                if current_state != "conversation":
+                    self.display_window.set_animation_state("idle")
         except (sr.UnknownValueError, sr.WaitTimeoutError):
             pass  # Nothing recognized or timeout
         except sr.RequestError as e:
