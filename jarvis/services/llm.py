@@ -21,6 +21,8 @@ class LLMService:
         """
         self.model = OLLAMA_MODEL
         self.conversation_history = []
+        self.response_cache = {}  # Cache for common queries
+        self.cache_size_limit = 50  # Maximum number of cached responses
     
     def ask(self, query):
         """
@@ -33,14 +35,28 @@ class LLMService:
             str: The model's response
         """
         try:
+            # Check cache for exact query match
+            cache_key = query.strip().lower()
+            if cache_key in self.response_cache:
+                print("Using cached response")
+                return self.response_cache[cache_key]
+            
             # Use conversation history for context if available
             context = self.conversation_history if self.conversation_history else None
             
-            # Generate response from Ollama
+            # Generate response from Ollama with optimized parameters
             response = ollama.generate(
                 model=self.model,
                 prompt=query,
-                context=context[-MAX_HISTORY_LENGTH:] if context else None
+                context=context[-MAX_HISTORY_LENGTH:] if context else None,
+                options={
+                    "num_predict": 256,  # Limit token generation for faster responses
+                    "temperature": 0.7,  # Slightly lower temperature for more focused responses
+                    "top_k": 40,        # Limit vocabulary search space
+                    "top_p": 0.9,       # Nucleus sampling parameter
+                    "num_gpu": 1,        # Use GPU acceleration if available
+                    "num_thread": 4      # Use multiple threads for processing
+                }
             )
             
             # Update conversation history
@@ -49,6 +65,13 @@ class LLMService:
             # Trim conversation history if needed
             if len(self.conversation_history) > MAX_HISTORY_LENGTH * 2:
                 self.conversation_history = self.conversation_history[-MAX_HISTORY_LENGTH * 2:]
+            
+            # Cache the response
+            if len(self.response_cache) >= self.cache_size_limit:
+                # Remove oldest item if cache is full
+                oldest_key = next(iter(self.response_cache))
+                self.response_cache.pop(oldest_key)
+            self.response_cache[cache_key] = response['response']
             
             return response['response']
         
@@ -93,4 +116,11 @@ class LLMService:
         Clear conversation history.
         """
         self.conversation_history = []
+        return True
+        
+    def clear_cache(self):
+        """
+        Clear response cache.
+        """
+        self.response_cache = {}
         return True

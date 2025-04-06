@@ -7,6 +7,9 @@ This module handles speech recognition and text-to-speech functionality.
 
 import speech_recognition as sr
 import pyttsx3
+import threading
+import queue
+from config.settings import WAKE_WORDS
 from core.animated_display import AnimatedDisplayWindow
 
 class SpeechEngine:
@@ -29,6 +32,64 @@ class SpeechEngine:
         # Initialize animated display window
         self.display_window = AnimatedDisplayWindow()
         self.display_window.start()
+        
+        # Interruption handling
+        self.speaking = False
+        self.should_interrupt = False
+        self.interrupt_event = threading.Event()
+        self.background_listener_active = False
+        self.background_listener_thread = None
+        self.audio_queue = queue.Queue()
+    
+    def _background_listener(self):
+        """
+        Background thread that listens for wake words while speaking.
+        """
+        self.background_listener_active = True
+        try:
+            with sr.Microphone() as source:
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                while self.speaking and not self.should_interrupt:
+                    try:
+                        audio = self.recognizer.listen(source, timeout=1, phrase_time_limit=2)
+                        self.audio_queue.put(audio)
+                    except (sr.WaitTimeoutError, sr.UnknownValueError):
+                        continue
+                    except Exception as e:
+                        print(f"Background listener error: {e}")
+                        break
+        except Exception as e:
+            print(f"Background listener setup error: {e}")
+        finally:
+            self.background_listener_active = False
+    
+    def _process_audio_queue(self):
+        """
+        Process audio queue to detect wake words.
+        """
+        while self.speaking and not self.should_interrupt:
+            try:
+                if not self.audio_queue.empty():
+                    audio = self.audio_queue.get(block=False)
+                    try:
+                        command = self.recognizer.recognize_google(audio).lower()
+                        print(f"Background recognized: {command}")
+                        
+                        # Check if command contains wake word
+                        if any(word in command for word in WAKE_WORDS):
+                            # Don't interrupt if already in conversation mode
+                            current_state = getattr(self.display_window, 'animation_state', 'idle')
+                            if current_state != "conversation":
+                                print("Wake word detected while speaking - interrupting")
+                                self.should_interrupt = True
+                                self.interrupt_event.set()
+                    except sr.UnknownValueError:
+                        pass
+                    except Exception as e:
+                        print(f"Audio processing error: {e}")
+            except queue.Empty:
+                pass
+            time.sleep(0.1)
     
     def speak(self, text):
         """
@@ -48,9 +109,43 @@ class SpeechEngine:
         # Display text in animated GUI window
         self.display_window.display(text)
         
-        # Convert to speech
+        # Reset interruption flags
+        self.speaking = True
+        self.should_interrupt = False
+        self.interrupt_event.clear()
+        
+        # Start background listener if not already running
+        if not self.background_listener_active:
+            self.background_listener_thread = threading.Thread(target=self._background_listener)
+            self.background_listener_thread.daemon = True
+            self.background_listener_thread.start()
+            
+            # Start audio processing thread
+            audio_processor = threading.Thread(target=self._process_audio_queue)
+            audio_processor.daemon = True
+            audio_processor.start()
+        
+        # Convert to speech with interruption support
+        def on_word(name, location, length):
+            if self.should_interrupt:
+                return False  # Stop speech
+            return True
+        
+        # Connect callback
+        self.engine.connect('started-word', on_word)
+        
+        # Say the text
         self.engine.say(text)
         self.engine.runAndWait()
+        
+        # Clean up
+        self.speaking = False
+        self.engine.disconnect('started-word')
+        
+        # If interrupted, return to listening state
+        if self.should_interrupt:
+            print("Speech interrupted - returning to listening state")
+            self.display_window.set_animation_state("listening")
     
     def listen(self, timeout=5):
         """
