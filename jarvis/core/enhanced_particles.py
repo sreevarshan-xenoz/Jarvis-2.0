@@ -33,6 +33,23 @@ class ParticleSystem:
         self.flow_field = None
         self.collision_grid = {}
         self.grid_cell_size = 20  # Size of collision grid cells
+        self.friendly_mode = True  # Enable friendly animations by default
+        self.emoji_particles = []  # Store emoji particles separately
+        self.last_emoji_time = 0  # Track when the last emoji was created
+        
+        # Friendly animation settings
+        self.emoji_set = ['😊', '👍', '✨', '🎵', '💡', '🚀', '🔍', '👋', '😄', '🎉']
+        self.reaction_emojis = {
+            'listening': ['👂', '🎧', '🔊', '👀'],
+            'speaking': ['💬', '🗣️', '📢', '🎵'],
+            'success': ['✅', '👍', '🎉', '😊'],
+            'thinking': ['🤔', '💭', '⏳', '🧠'],
+            'error': ['❌', '😕', '🤷', '⚠️'],
+            'joke': ['😂', '🤣', '😆', '😄']
+        }
+        self.emoji_lifetime = 3.0  # Seconds
+        self.emoji_spawn_chance = 0.02  # Chance per update
+        self.emoji_min_interval = 2.0  # Minimum seconds between emoji spawns
         
         # Particle types and their properties
         self.particle_types = {
@@ -96,6 +113,29 @@ class ParticleSystem:
                 'color_shift': 0.0,  # No color shift
                 'mass': 10.0,
                 'attraction_strength': 0.05
+            },
+            # Friendly particle types
+            'bubble': {
+                'size_range': (5, 12),
+                'speed_range': (0.3, 1.2),
+                'lifetime_range': (1.5, 3.0),
+                'opacity_range': (0.4, 0.8),
+                'trail_chance': 0.0,
+                'collision_radius': 8.0,  # Soft collision
+                'color_shift': 0.2,  # Moderate color shift
+                'mass': 0.8,
+                'is_bubble': True  # Special flag for bubble behavior
+            },
+            'bounce': {
+                'size_range': (4, 8),
+                'speed_range': (1.0, 3.0),
+                'lifetime_range': (1.0, 2.5),
+                'opacity_range': (0.7, 1.0),
+                'trail_chance': 0.3,
+                'collision_radius': 6.0,  # Enable bouncy collision
+                'color_shift': 0.15,  # Slight color shift
+                'mass': 1.2,
+                'bounce_factor': 0.8  # How bouncy the particle is
             }
         }
         
@@ -187,6 +227,125 @@ class ParticleSystem:
         force_y = math.sin(angle) * 0.2
         
         return (force_x, force_y)
+    
+    def create_emoji_particle(self, x, y, state='idle'):
+        """
+        Create an emoji particle at the specified position based on the current state.
+        
+        Args:
+            x (float): X coordinate
+            y (float): Y coordinate
+            state (str): Current animation state
+        """
+        # Select appropriate emoji based on state
+        if state in self.reaction_emojis:
+            emoji = random.choice(self.reaction_emojis[state])
+        else:
+            emoji = random.choice(self.emoji_set)
+        
+        # Create emoji particle with random movement
+        angle = random.uniform(0, 2 * math.pi)
+        speed = random.uniform(0.5, 1.5)
+        vx = math.cos(angle) * speed
+        vy = math.sin(angle) * speed - 0.5  # Slight upward bias
+        
+        # Add emoji particle
+        self.emoji_particles.append({
+            'emoji': emoji,
+            'x': x,
+            'y': y,
+            'vx': vx,
+            'vy': vy,
+            'size': random.uniform(20, 30),
+            'opacity': 1.0,
+            'lifetime': self.emoji_lifetime,
+            'age': 0.0,
+            'rotation': random.uniform(-15, 15),
+            'rotation_speed': random.uniform(-5, 5)
+        })
+    
+    def create_reaction(self, x, y, reaction_type):
+        """
+        Create a reaction emoji burst for specific events.
+        
+        Args:
+            x (float): X coordinate
+            y (float): Y coordinate
+            reaction_type (str): Type of reaction ('success', 'error', 'joke', etc.)
+        """
+        if not self.friendly_mode:
+            return
+            
+        # Create multiple emojis for the reaction
+        count = random.randint(3, 6)
+        for _ in range(count):
+            # Select emoji based on reaction type
+            if reaction_type in self.reaction_emojis:
+                emoji = random.choice(self.reaction_emojis[reaction_type])
+            else:
+                emoji = random.choice(self.emoji_set)
+            
+            # Create with burst pattern
+            angle = random.uniform(0, 2 * math.pi)
+            distance = random.uniform(10, 40)
+            pos_x = x + math.cos(angle) * distance
+            pos_y = y + math.sin(angle) * distance
+            
+            # Add emoji with random movement
+            speed = random.uniform(1.0, 2.0)
+            vx = math.cos(angle) * speed * 0.5
+            vy = math.sin(angle) * speed * 0.5 - 1.0  # Stronger upward bias
+            
+            self.emoji_particles.append({
+                'emoji': emoji,
+                'x': pos_x,
+                'y': pos_y,
+                'vx': vx,
+                'vy': vy,
+                'size': random.uniform(25, 35),
+                'opacity': 1.0,
+                'lifetime': self.emoji_lifetime * 1.5,
+                'age': 0.0,
+                'rotation': random.uniform(-20, 20),
+                'rotation_speed': random.uniform(-8, 8)
+            })
+    
+    def update_emoji_particles(self, dt):
+        """
+        Update emoji particles with physics and aging.
+        
+        Args:
+            dt (float): Time delta in seconds
+        """
+        # Update existing emoji particles
+        i = 0
+        while i < len(self.emoji_particles):
+            emoji = self.emoji_particles[i]
+            
+            # Update age
+            emoji['age'] += dt
+            if emoji['age'] >= emoji['lifetime']:
+                # Remove expired emoji
+                self.emoji_particles.pop(i)
+                continue
+            
+            # Update position with physics
+            emoji['x'] += emoji['vx'] * dt * 60
+            emoji['y'] += emoji['vy'] * dt * 60
+            
+            # Add gravity and friction
+            emoji['vy'] += 0.05 * dt  # Gravity
+            emoji['vx'] *= 0.98  # Horizontal friction
+            
+            # Update rotation
+            emoji['rotation'] += emoji['rotation_speed'] * dt
+            
+            # Update opacity (fade out near end of life)
+            life_ratio = emoji['age'] / emoji['lifetime']
+            if life_ratio > 0.7:
+                emoji['opacity'] = 1.0 - ((life_ratio - 0.7) / 0.3)
+            
+            i += 1
     
     def _update_collision_grid(self):
         """
@@ -522,18 +681,35 @@ class ParticleSystem:
         # Spawn new particles
         for _ in range(int(spawn_rate)):
             if len(self.particles) < self.max_particles and random.random() < intensity:
-                # Determine particle type based on animation state
-                if animation_state == 'idle':
-                    particle_type = random.choice(['normal', 'pulse'])
-                elif animation_state == 'listening':
-                    particle_type = random.choice(['normal', 'pulse', 'trail', 'physics'])
-                elif animation_state == 'speaking':
-                    particle_type = random.choice(['normal', 'pulse', 'trail', 'spark', 'physics', 'attractor'])
+                # Determine particle type based on animation state and friendly mode
+                if self.friendly_mode:
+                    if animation_state == 'idle':
+                        particle_type = random.choice(['normal', 'pulse', 'bubble'])
+                    elif animation_state == 'listening':
+                        particle_type = random.choice(['normal', 'pulse', 'trail', 'bounce'])
+                    elif animation_state == 'speaking':
+                        particle_type = random.choice(['normal', 'pulse', 'trail', 'bounce', 'bubble'])
+                    else:
+                        particle_type = 'normal'
                 else:
-                    particle_type = 'normal'
+                    if animation_state == 'idle':
+                        particle_type = random.choice(['normal', 'pulse'])
+                    elif animation_state == 'listening':
+                        particle_type = random.choice(['normal', 'pulse', 'trail', 'physics'])
+                    elif animation_state == 'speaking':
+                        particle_type = random.choice(['normal', 'pulse', 'trail', 'spark', 'physics', 'attractor'])
+                    else:
+                        particle_type = 'normal'
                     
                 # Create particle at center
                 self.create_particle(center_x, center_y, particle_type)
+                
+        # Spawn emoji particles in friendly mode
+        current_time = time.time()
+        if self.friendly_mode and current_time - self.last_emoji_time > self.emoji_min_interval:
+            if random.random() < self.emoji_spawn_chance * intensity:
+                self.last_emoji_time = current_time
+                self.create_emoji_particle(center_x, center_y, animation_state)
         
         # Check for collisions
         self._check_collisions()
