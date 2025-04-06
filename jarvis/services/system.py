@@ -296,6 +296,7 @@ class SystemService:
                             chrome_windows = []
                         
                         # Check each Chrome window for our tab patterns
+                        tab_found = False
                         for window in chrome_windows:
                             window_title = window.get('title', '')
                             for pattern in search_patterns:
@@ -303,18 +304,149 @@ class SystemService:
                                     # Found the tab, activate the window and close it
                                     handle = window.get('handle')
                                     if handle:
-                                        # Activate the window
-                                        subprocess.run(
-                                            ["powershell", "-Command", f"[void][System.Runtime.InteropServices.Marshal]::SetForegroundWindow(0x{handle:X})"],
-                                            stdout=subprocess.DEVNULL,
-                                            stderr=subprocess.DEVNULL
-                                        )
-                                        time.sleep(0.5)  # Wait for window to activate
-                                        
-                                        # Close the tab with Ctrl+W
-                                        pyautogui.hotkey('ctrl', 'w')
-                                        print(f"Closed Chrome tab with title containing '{pattern}'")
-                                        return True
+                                        tab_found = True
+                                        try:
+                                            # Convert handle to integer
+                                            handle_int = int(handle)
+                                            
+                                            # Activate the window
+                                            subprocess.run(
+                                                ["powershell", "-Command", f"[void][System.Runtime.InteropServices.Marshal]::SetForegroundWindow({handle_int})"],
+                                                stdout=subprocess.DEVNULL,
+                                                stderr=subprocess.DEVNULL,
+                                                timeout=3  # Add timeout to prevent hanging
+                                            )
+                                            time.sleep(0.8)  # Increase wait time for window to activate
+                                            
+                                            # Close the tab with Ctrl+W
+                                            pyautogui.hotkey('ctrl', 'w')
+                                            time.sleep(0.5)  # Wait for tab to close
+                                            
+                                            # Verify the tab was closed by checking if the window title changed
+                                            new_title = ""
+                                            try:
+                                                new_title = subprocess.check_output(
+                                                    ["powershell", "-Command", f"(Get-Process | Where-Object {{$_.Id -eq {window.get('pid')}}} | Select-Object MainWindowTitle).MainWindowTitle"],
+                                                    stderr=subprocess.DEVNULL,
+                                                    timeout=3
+                                                ).decode('utf-8', errors='ignore').strip()
+                                            except:
+                                                pass
+                                                
+                                            # If the title is the same, the tab wasn't closed
+                                            if pattern.lower() in new_title.lower():
+                                                print(f"Failed to close tab with title containing '{pattern}' - trying alternative method")
+                                                # Try alternative method - send Alt+F4
+                                                pyautogui.hotkey('alt', 'f4')
+                                                time.sleep(0.5)
+                                            else:
+                                                print(f"Successfully closed Chrome tab with title containing '{pattern}'")
+                                                return True
+                                        except Exception as e:
+                                            print(f"Error activating window: {str(e)}")
+                                            # Continue to try alternative methods
+                        
+                        # If we found a tab but couldn't close it with the primary method, try the fallback
+                        if tab_found:
+                            # Try a more aggressive approach for Chrome
+                            try:
+                                # Activate any Chrome window
+                                subprocess.run(
+                                    ["powershell", "-Command", "Get-Process chrome | Where-Object {$_.MainWindowTitle -ne ''} | Select-Object -First 1 | ForEach-Object { $_.MainWindowHandle } | ForEach-Object { [void][System.Runtime.InteropServices.Marshal]::SetForegroundWindow($_) }"],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    timeout=3
+                                )
+                                time.sleep(0.8)
+                                
+                                # Try to find and close the tab by cycling through tabs
+                                max_tabs = 20  # Increase the number of tabs to check
+                                
+                                for _ in range(max_tabs):
+                                    # Get current window title
+                                    current_title = ""
+                                    try:
+                                        current_title = subprocess.check_output(
+                                            ["powershell", "-Command", "(Get-Process | Where-Object {$_.ProcessName -like '*chrome*' -and $_.MainWindowTitle -ne ''} | Select-Object -First 1 MainWindowTitle).MainWindowTitle"],
+                                            stderr=subprocess.DEVNULL,
+                                            timeout=2
+                                        ).decode('utf-8', errors='ignore').strip()
+                                    except:
+                                        pass
+                                    
+                                    # Check if current tab matches our target
+                                    for pattern in search_patterns:
+                                        if pattern.lower() in current_title.lower():
+                                            # Found the tab, close it with multiple methods for reliability
+                                            print(f"Found tab with title containing '{pattern}', attempting to close")
+                                            
+                                            # Method 1: Ctrl+W
+                                            pyautogui.hotkey('ctrl', 'w')
+                                            time.sleep(0.5)
+                                            
+                                            # Verify if tab was closed
+                                            new_title = ""
+                                            try:
+                                                new_title = subprocess.check_output(
+                                                    ["powershell", "-Command", "(Get-Process | Where-Object {$_.ProcessName -like '*chrome*' -and $_.MainWindowTitle -ne ''} | Select-Object -First 1 MainWindowTitle).MainWindowTitle"],
+                                                    stderr=subprocess.DEVNULL,
+                                                    timeout=2
+                                                ).decode('utf-8', errors='ignore').strip()
+                                            except:
+                                                pass
+                                            
+                                            # If tab was closed successfully
+                                            if pattern.lower() not in new_title.lower():
+                                                print(f"Successfully closed tab with title containing '{pattern}'")
+                                                return True
+                                            
+                                            # Method 2: Alt+F4 if Ctrl+W didn't work
+                                            print("Ctrl+W didn't work, trying Alt+F4")
+                                            pyautogui.hotkey('alt', 'f4')
+                                            time.sleep(0.5)
+                                            
+                                            print(f"Used fallback method to close {tab_name} tab")
+                                            return True
+                                    
+                                    # Move to next tab
+                                    pyautogui.hotkey('ctrl', 'tab')
+                                    time.sleep(0.3)  # Wait for tab switch
+                                
+                                # If we couldn't find the tab by cycling, try a direct approach
+                                # Open a new tab and navigate to the site, then close it
+                                print(f"Could not find {tab_name} tab by cycling, trying direct approach")
+                                
+                                # Open new tab
+                                pyautogui.hotkey('ctrl', 't')
+                                time.sleep(0.5)
+                                
+                                # Type the website URL directly
+                                if tab_name.lower() == 'youtube':
+                                    pyautogui.write('youtube.com')
+                                elif tab_name.lower() == 'facebook':
+                                    pyautogui.write('facebook.com')
+                                elif tab_name.lower() == 'twitter':
+                                    pyautogui.write('twitter.com')
+                                elif tab_name.lower() == 'instagram':
+                                    pyautogui.write('instagram.com')
+                                elif tab_name.lower() == 'gmail':
+                                    pyautogui.write('mail.google.com')
+                                else:
+                                    pyautogui.write(f'{tab_name}.com')
+                                
+                                # Press Enter to navigate to the site
+                                pyautogui.press('enter')
+                                time.sleep(1.5)  # Wait longer for page to start loading
+                                
+                                # Close the tab
+                                pyautogui.hotkey('ctrl', 'w')
+                                time.sleep(0.5)
+                                
+                                print(f"Used direct approach to close {tab_name} tab")
+                                return True
+                            except Exception as e:
+                                print(f"Error with fallback method: {str(e)}")
+                                # Continue to generic approach
                     except Exception as e:
                         print(f"Error with Chrome-specific approach: {str(e)}")
                         # Continue to the generic approach if Chrome-specific fails
