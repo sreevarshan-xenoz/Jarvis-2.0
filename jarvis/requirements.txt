@@ -27,3 +27,6 @@ pydantic>=2.0.0  # Required by ollama
 # For Windows volume control (optional)
 # Download NirCmd from https://www.nirsoft.net/utils/nircmd.html
 # and place nircmd.exe in your PATH or project directory
+
+# For browser tab control
+pyautogui>=0.9.53  # Required for closing browser tabs

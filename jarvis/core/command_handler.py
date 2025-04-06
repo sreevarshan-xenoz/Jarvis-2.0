@@ -6,6 +6,7 @@ This module processes and executes different voice commands.
 """
 
 import datetime
+import re
 
 from services.weather import WeatherService
 from services.news import NewsService
@@ -13,6 +14,7 @@ from services.media import MediaService
 from services.browser import BrowserService
 from services.system import SystemService
 from services.llm import LLMService
+from services.web_search import WebSearchService
 
 class CommandHandler:
     """
@@ -35,6 +37,7 @@ class CommandHandler:
         self.browser_service = BrowserService()
         self.system_service = SystemService()
         self.llm_service = LLMService()
+        self.web_search_service = WebSearchService()
     
     def process_command(self, command):
         """
@@ -86,6 +89,53 @@ class CommandHandler:
         elif 'volume down' in command:
             self.system_service.volume_down()
             self.speech_engine.speak('Decreasing volume')
+        
+        # Web search commands
+        elif re.search(r'search (for|on)\s+', command) or command.startswith('search '):
+            # Extract search query and optional engine
+            search_pattern = re.search(r'search (for|on)?\s+(.*?)( on| using| with)? ?(google|bing|duckduckgo|youtube)?$', command)
+            
+            if search_pattern:
+                query = search_pattern.group(2).strip()
+                engine = search_pattern.group(4) if search_pattern.group(4) else None
+            else:
+                query = command.replace('search', '', 1).strip()
+                engine = None
+            
+            if query:
+                engine_text = f" on {engine}" if engine else ""
+                self.speech_engine.speak(f"Searching{engine_text} for {query}")
+                self.web_search_service.search(query, engine)
+            else:
+                self.speech_engine.speak("What would you like me to search for?")
+        
+        # Close application commands
+        elif re.search(r'close|exit|quit', command) and not (command == 'exit' or command == 'quit' or 'goodbye' in command):
+            # First remove close/exit/quit keywords
+            app_name = re.sub(r'(close|exit|quit)\s+', '', command).strip()
+            
+            # Then remove any wake words that might be in the command
+            from config.settings import WAKE_WORDS
+            for wake_word in WAKE_WORDS:
+                if app_name.lower().startswith(wake_word.lower()):
+                    app_name = app_name[len(wake_word):].strip()
+            
+            if app_name:
+                # Provide better feedback for browser tabs
+                if app_name.lower() in ['youtube', 'facebook', 'twitter', 'instagram', 'gmail']:
+                    self.speech_engine.speak(f"Trying to close {app_name}...")
+                    if self.system_service.close_application(app_name):
+                        self.speech_engine.speak(f"Successfully closed {app_name}")
+                    else:
+                        self.speech_engine.speak(f"I couldn't find an open {app_name} tab")
+                # Regular applications
+                else:
+                    if self.system_service.close_application(app_name):
+                        self.speech_engine.speak(f"Closed {app_name}")
+                    else:
+                        self.speech_engine.speak(f"Could not find {app_name} running")
+            else:
+                self.speech_engine.speak("Which application would you like me to close?")
         
         # Browser commands
         elif 'open' in command:
