@@ -38,7 +38,30 @@ class AnimatedDisplayWindow:
         self.wave_points = []
         self.animation_intensity = 0
         self.animation_fade_speed = 0.05
-        self.animation_state = "idle"  # idle, listening, speaking
+        self.animation_state = "idle"  # idle, listening, speaking, conversation
+        # Animation state properties
+        self.state_properties = {
+            "idle": {
+                "intensity": 0.3,
+                "color": "accent",
+                "wave_amplitude": 5
+            },
+            "listening": {
+                "intensity": 0.7,
+                "color": "success",
+                "wave_amplitude": 15
+            },
+            "speaking": {
+                "intensity": 0.9,
+                "color": "warning",
+                "wave_amplitude": 20
+            },
+            "conversation": {
+                "intensity": 0.8,
+                "color": "accent_secondary",
+                "wave_amplitude": 18
+            }
+        }
         # Modern color scheme with gradients
         self.color_scheme = {
             "bg_dark": "#0a1622",
@@ -69,9 +92,6 @@ class AnimatedDisplayWindow:
         self.root.geometry("900x650")
         self.root.configure(bg=self.color_scheme["bg_dark"])
         self.root.minsize(800, 600)  # Set minimum window size
-        
-        # Initialize image resources
-        self.images = {}
         
         # Create gradient background image
         self._create_gradient_background()
@@ -606,6 +626,13 @@ class AnimatedDisplayWindow:
                 "glow": "#ff8000",  # Slightly darker orange
                 "secondary": "#ffb366",  # Light orange
                 "spawn_rate": 5
+            },
+            "conversation": {
+                "intensity": 0.8,
+                "color": self.color_scheme["accent_secondary"],
+                "glow": self.color_scheme["accent_glow"],
+                "secondary": self.color_scheme["accent"],
+                "spawn_rate": 4
             }
         }
         

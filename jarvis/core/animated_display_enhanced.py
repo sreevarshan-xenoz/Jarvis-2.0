@@ -35,29 +35,13 @@ class EnhancedAnimatedDisplayWindow(AnimatedDisplayWindow):
         """
         Initialize the enhanced animated display window.
         """
+        # Initialize the parent class
+        super().__init__()
+        
         # Initialize enhanced features
         self.ui_integrator = None
         self.enhanced_objects = []
         self.using_enhanced_features = True
-        
-        # Initialize the parent class
-        super().__init__()
-        
-        # Create window in the main thread
-        self.root = tk.Tk()
-        self.root.withdraw()  # Hide window initially
-        self.root.after(100, self._delayed_window_creation)
-    
-    def _delayed_window_creation(self):
-        """
-        Create the window after a short delay to ensure proper initialization.
-        """
-        self.root.deiconify()  # Show window
-        self._create_window()
-        
-        # Initialize UI integrator after window creation
-        self.ui_integrator = UIIntegrator(self)
-        self.ui_integrator.initialize()
     
     def _create_window(self):
         """
@@ -107,13 +91,19 @@ class EnhancedAnimatedDisplayWindow(AnimatedDisplayWindow):
         """
         Initialize the animation elements with enhanced features.
         """
-        # Call the parent method to initialize basic animation
-        super()._init_animation()
-        
-        # Initialize enhanced features
-        if not self.ui_integrator:
-            self.ui_integrator = UIIntegrator(self)
-            self.ui_integrator.initialize()
+        try:
+            # Call the parent method to initialize basic animation
+            super()._init_animation()
+            
+            # Initialize enhanced features
+            if not self.ui_integrator:
+                self.ui_integrator = UIIntegrator(self)
+                if not self.ui_integrator.initialize():
+                    print("Failed to initialize enhanced features. Falling back to basic animation.")
+                    self.using_enhanced_features = False
+        except Exception as e:
+            print(f"Error initializing animation: {e}. Falling back to basic animation.")
+            self.using_enhanced_features = False
     
     def _animate(self):
         """

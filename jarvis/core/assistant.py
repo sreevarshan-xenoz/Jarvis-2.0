@@ -23,16 +23,14 @@ class JarvisAssistant:
         Initialize the Jarvis assistant with all core components.
 
         Args:
-            theme_manager: ThemeManager instance for UI theming
-            profile_manager: ProfileManager for user profiles
-            dataset_manager: DatasetManager for handling datasets
-            display: EnhancedAnimatedDisplay for visual feedback
-            ui_integrator: UIIntegrator for UI coordination
-            gesture_recognition: GestureRecognizer for gesture commands
-            context_awareness: ContextAwareness for situational awareness
+            theme_manager: Theme management component
+            profile_manager: User profile management component
+            dataset_manager: Dataset management component
+            display: Display interface component
+            ui_integrator: UI integration component
+            gesture_recognition: Gesture recognition component
+            context_awareness: Context awareness component
         """
-        self.speech_engine = SpeechEngine()
-        self.command_handler = CommandHandler(self.speech_engine)
         self.theme_manager = theme_manager
         self.profile_manager = profile_manager
         self.dataset_manager = dataset_manager
@@ -40,6 +38,9 @@ class JarvisAssistant:
         self.ui_integrator = ui_integrator
         self.gesture_recognition = gesture_recognition
         self.context_awareness = context_awareness
+
+        self.speech_engine = SpeechEngine()
+        self.command_handler = CommandHandler(self.speech_engine)
         self.is_active = False
         self.conversation_active = False
         self.last_interaction_time = 0

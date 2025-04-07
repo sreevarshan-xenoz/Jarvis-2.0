@@ -41,25 +41,13 @@ class OpenGLRenderer:
         self.height = height
         self.available = OPENGL_AVAILABLE
         self.initialized = False
-        
-        # Optimize texture and model management
-        self._texture_cache = {}
-        self._model_cache = {}
-        self._vertex_buffers = {}
-        self._index_buffers = {}
-        self._batch_size = 1000  # Increased batch size for better performance
-        
-        # Use NumPy arrays for better performance
+        self.texture_ids = {}
+        self.models = {}
         self.camera_position = np.array([0.0, 0.0, 5.0], dtype=np.float32)
         self.camera_rotation = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         self.light_position = np.array([0.0, 5.0, 5.0, 1.0], dtype=np.float32)
         self.animation_time = 0.0
-        
-        # Pre-allocate transformation matrices
-        self.model_matrix = np.eye(4, dtype=np.float32)
-        self.view_matrix = np.eye(4, dtype=np.float32)
-        self.projection_matrix = np.eye(4, dtype=np.float32)
-        
+        self._batch_size = 100  # Process particles in batches
         self._cleanup_required = False
         
         # Animation parameters
@@ -117,31 +105,19 @@ class OpenGLRenderer:
             return
             
         try:
-            # Batch delete textures
-            if self._texture_cache:
-                texture_ids = list(self._texture_cache.values())
-                glDeleteTextures(len(texture_ids), texture_ids)
-                self._texture_cache.clear()
+            # Delete textures
+            for texture_id in self.texture_ids.values():
+                glDeleteTextures(texture_id)
+            self.texture_ids.clear()
             
-            # Batch delete models/quadrics
-            for model in self._model_cache.values():
+            # Delete models/quadrics
+            for model in self.models.values():
                 if model:
                     try:
                         gluDeleteQuadric(model)
                     except Exception as e:
                         print(f"Error deleting quadric: {e}")
-            self._model_cache.clear()
-            
-            # Batch delete vertex and index buffers
-            if self._vertex_buffers:
-                vbos = list(self._vertex_buffers.values())
-                glDeleteBuffers(len(vbos), vbos)
-                self._vertex_buffers.clear()
-            
-            if self._index_buffers:
-                ibos = list(self._index_buffers.values())
-                glDeleteBuffers(len(ibos), ibos)
-                self._index_buffers.clear()
+            self.models.clear()
             
             # Delete FBO and associated resources
             if self.fbo:
@@ -167,13 +143,33 @@ class OpenGLRenderer:
             return False
             
         try:
-            # Initialize GLUT for offscreen rendering
-            glutInit()
-            glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-            glutInitWindowSize(self.width, self.height)
-            glutCreateWindow("Jarvis 3D Renderer")
+            # Create FBO for offscreen rendering
+            self.fbo = glGenFramebuffers(1)
+            glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
+            
+            # Create texture for color attachment
+            self.render_texture = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, self.render_texture)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self.width, self.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+            
+            # Create renderbuffer for depth attachment
+            self.depth_buffer = glGenRenderbuffers(1)
+            glBindRenderbuffer(GL_RENDERBUFFER, self.depth_buffer)
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, self.width, self.height)
+            
+            # Attach texture and renderbuffer to FBO
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.render_texture, 0)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.depth_buffer)
+            
+            # Check FBO status
+            if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+                print("Error: Framebuffer is not complete!")
+                return False
             
             # Set up OpenGL state
+            glViewport(0, 0, self.width, self.height)
             glClearColor(0.0, 0.0, 0.0, 0.0)  # Transparent background
             glEnable(GL_DEPTH_TEST)
             glDepthFunc(GL_LEQUAL)

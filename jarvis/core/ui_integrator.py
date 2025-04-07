@@ -52,25 +52,12 @@ class UIIntegrator:
         self.opengl_renderer = None
         self.theme_manager = ThemeManager()
         
-        # Initialize UI controls dictionary
+        # Setup UI controls for feature toggling
         self.ui_controls = {}
         
-        # Wait for display window to be ready
-        self.display.root.after(100, self._delayed_init)
-    
-    def _delayed_init(self):
-        """
-        Perform delayed initialization after display window is ready.
-        """
         # Apply initial theme
         self._apply_theme(self.theme_manager.get_theme())
-        
-        # Create basic UI frame for controls
-        if hasattr(self.display, 'root') and self.display.root:
-            control_frame = tk.Frame(self.display.root)
-            control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
-            self.ui_controls['settings_frame'] = control_frame
-        
+    
     def initialize(self):
         """
         Initialize all enhanced UI features.
@@ -103,19 +90,23 @@ class UIIntegrator:
             self.active_features['enhanced_particles'] = False
         
         # Initialize 3D renderer if OpenGL is available
-        if OPENGL_AVAILABLE:
-            try:
+        try:
+            if OPENGL_AVAILABLE:
                 self.opengl_renderer = OpenGLRenderer(400, 300)  # Smaller size for overlay
                 if self.opengl_renderer.initialize():
                     self.active_features['3d_rendering'] = True
                 else:
-                    print("Failed to initialize OpenGL renderer.")
+                    print("Failed to initialize OpenGL renderer. Falling back to 2D rendering.")
                     self.active_features['3d_rendering'] = False
-            except Exception as e:
-                print(f"Error initializing OpenGL renderer: {e}")
+                    self.opengl_renderer = None
+            else:
+                print("OpenGL not available. Using 2D rendering only.")
                 self.active_features['3d_rendering'] = False
-        else:
+                self.opengl_renderer = None
+        except Exception as e:
+            print(f"Error initializing OpenGL renderer: {e}. Falling back to 2D rendering.")
             self.active_features['3d_rendering'] = False
+            self.opengl_renderer = None
         
         # Add UI controls for feature toggling
         self._setup_ui_controls()

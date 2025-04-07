@@ -28,25 +28,11 @@ class ParticleSystem:
         self.width = width
         self.height = height
         self.max_particles = max_particles
-        
-        # Use NumPy arrays for better performance
-        self.particle_data = np.zeros((max_particles, 8), dtype=np.float32)  # x, y, vx, vy, size, lifetime, opacity, type
-        self.active_particles = np.zeros(max_particles, dtype=bool)
-        self.particle_count = 0
-        
-        # Optimize trail storage
-        self.max_trails = max_particles * 2
-        self.trail_data = np.zeros((self.max_trails, 6), dtype=np.float32)  # x, y, size, lifetime, opacity, type
-        self.active_trails = np.zeros(self.max_trails, dtype=bool)
-        self.trail_count = 0
-        
+        self.particles = []
+        self.trails = []
         self.flow_field = None
-        # Optimize collision grid with numpy
-        self.grid_cell_size = 20
-        self.grid_cols = int(width / self.grid_cell_size) + 1
-        self.grid_rows = int(height / self.grid_cell_size) + 1
-        self.collision_grid = np.zeros((self.grid_rows, self.grid_cols, max_particles), dtype=np.int32)
-        self.grid_counts = np.zeros((self.grid_rows, self.grid_cols), dtype=np.int32)
+        self.collision_grid = {}
+        self.grid_cell_size = 20  # Size of collision grid cells
         
         # Particle types and their properties
         self.particle_types = {
@@ -204,27 +190,14 @@ class ParticleSystem:
     
     def _update_collision_grid(self):
         """
-        Update the spatial partitioning grid for efficient collision detection using NumPy.
+        Update the spatial partitioning grid for efficient collision detection.
         """
-        # Reset grid
-        self.grid_counts.fill(0)
-        self.collision_grid.fill(0)
+        # Clear the grid
+        self.collision_grid = {}
         
-        # Calculate grid positions for all active particles at once
-        active_mask = self.active_particles
-        if not np.any(active_mask):
-            return
-            
-        positions = self.particle_data[active_mask, :2]
-        grid_x = np.clip((positions[:, 0] / self.grid_cell_size).astype(np.int32), 0, self.grid_cols - 1)
-        grid_y = np.clip((positions[:, 1] / self.grid_cell_size).astype(np.int32), 0, self.grid_rows - 1)
-        
-        # Update grid efficiently
-        particle_indices = np.where(active_mask)[0]
-        for idx, (gx, gy) in enumerate(zip(grid_x, grid_y)):
-            if self.grid_counts[gy, gx] < self.max_particles:
-                self.collision_grid[gy, gx, self.grid_counts[gy, gx]] = particle_indices[idx]
-                self.grid_counts[gy, gx] += 1
+        # Add particles to grid cells
+        for i, particle in enumerate(self.particles):
+            # Skip particles without collision
             if particle.get('collision_radius', 0) <= 0:
                 continue
                 
