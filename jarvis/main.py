@@ -11,10 +11,7 @@ from core.assistant import JarvisAssistant
 from core.theme_manager import ThemeManager
 from core.user_profiles import ProfileManager
 from core.dataset_manager import DatasetManager
-from core.gesture_recognition import GestureRecognizer
-from core.context_awareness import ContextManager
-from core.animated_display_enhanced import EnhancedAnimatedDisplayWindow
-from core.ui_integrator import UIIntegrator
+from core.display_factory import create_display
 
 def initialize_core_components():
     """
@@ -29,21 +26,13 @@ def initialize_core_components():
     dataset_manager = DatasetManager()
     
     # Initialize UI components
-    display = EnhancedAnimatedDisplayWindow()
-    ui_integrator = UIIntegrator(display)
-    
-    # Initialize recognition systems
-    gesture_recognition = GestureRecognizer()
-    context_awareness = ContextManager()
+    display = create_display(use_animated=True)
     
     return (
         theme_manager,
         profile_manager,
         dataset_manager,
-        display,
-        ui_integrator,
-        gesture_recognition,
-        context_awareness
+        display
     )
 
 def main():
@@ -56,10 +45,7 @@ def main():
             theme_manager,
             profile_manager,
             dataset_manager,
-            display,
-            ui_integrator,
-            gesture_recognition,
-            context_awareness
+            display
         ) = initialize_core_components()
         
         # Initialize the main assistant with all components
@@ -68,9 +54,9 @@ def main():
             profile_manager=profile_manager,
             dataset_manager=dataset_manager,
             display=display,
-            ui_integrator=ui_integrator,
-            gesture_recognition=gesture_recognition,
-            context_awareness=context_awareness
+            ui_integrator=None,
+            gesture_recognition=None,
+            context_awareness=None
         )
         
         # Start the assistant

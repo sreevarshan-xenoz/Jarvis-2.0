@@ -31,7 +31,7 @@ class SpeechEngine:
         self.engine.setProperty('voice', voices[0].id)  # Default to male voice
         
         # Initialize display window with enhanced features
-        self.display_window = create_display(use_enhanced=True)
+        self.display_window = create_display(use_animated=True)
         self.display_window.start()
         
         # Interruption handling

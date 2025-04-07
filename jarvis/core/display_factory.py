@@ -10,28 +10,14 @@ based on configuration and available features.
 from core.display import DisplayWindow
 from core.animated_display import AnimatedDisplayWindow
 
-# Try to import enhanced display
-try:
-    from core.animated_display_enhanced import EnhancedAnimatedDisplayWindow
-    ENHANCED_AVAILABLE = True
-except ImportError:
-    ENHANCED_AVAILABLE = False
-
-def create_display(use_enhanced=True, use_animated=True):
+def create_display(use_animated=True):
     """
-    Create the appropriate display window based on configuration and available features.
+    Create the appropriate display window based on configuration.
     
     Args:
-        use_enhanced (bool): Whether to use enhanced animated display if available
-        use_animated (bool): Whether to use animated display at all
+        use_animated (bool): Whether to use animated display
         
     Returns:
         DisplayWindow: The created display window instance
     """
-    if use_animated:
-        if use_enhanced and ENHANCED_AVAILABLE:
-            return EnhancedAnimatedDisplayWindow()
-        else:
-            return AnimatedDisplayWindow()
-    else:
-        return DisplayWindow()
+    return AnimatedDisplayWindow() if use_animated else DisplayWindow()
