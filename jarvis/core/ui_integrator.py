@@ -575,35 +575,12 @@ class UIIntegrator:
                 color = particle['color']
                 opacity = particle.get('opacity', 1.0)
                 shape = particle.get('shape', 'oval')
-                is_bubble = particle.get('is_bubble', False)
                 
                 # Calculate opacity
                 opacity_hex = self._opacity_to_stipple(opacity)
                 
                 # Create particle based on shape
-                if is_bubble:
-                    # Create a rounded bubble effect
-                    particle_id = canvas.create_oval(
-                        x - size, y - size,
-                        x + size, y + size,
-                        fill=color,
-                        outline=color,
-                        width=1,
-                        stipple=opacity_hex
-                    )
-                    # Add a highlight to make it look like a bubble
-                    highlight_size = size * 0.4
-                    highlight_x = x - size * 0.3
-                    highlight_y = y - size * 0.3
-                    highlight_id = canvas.create_oval(
-                        highlight_x - highlight_size, highlight_y - highlight_size,
-                        highlight_x + highlight_size, highlight_y + highlight_size,
-                        fill="#ffffff",
-                        outline="",
-                        stipple=opacity_hex
-                    )
-                    particle_ids.append(highlight_id)
-                elif shape == 'oval':
+                if shape == 'oval':
                     particle_id = canvas.create_oval(
                         x - size, y - size,
                         x + size, y + size,
@@ -632,26 +609,6 @@ class UIIntegrator:
                 
                 # Store canvas ID in particle object for future updates
                 particle['id'] = particle_id
-        
-        # Render emoji particles if available
-        if hasattr(self.particle_system, 'emoji_particles') and self.particle_system.emoji_particles:
-            for emoji in self.particle_system.emoji_particles:
-                x = emoji.get('x', 0)
-                y = emoji.get('y', 0)
-                size = emoji.get('size', 25)
-                opacity = emoji.get('opacity', 1.0)
-                rotation = emoji.get('rotation', 0)
-                emoji_text = emoji.get('emoji', '😊')
-                
-                # Create text with emoji
-                emoji_id = canvas.create_text(
-                    x, y,
-                    text=emoji_text,
-                    font=("Segoe UI Emoji", int(size)),
-                    fill="#ffffff",  # White
-                    angle=rotation  # Apply rotation
-                )
-                particle_ids.append(emoji_id)
         
         return particle_ids
     

@@ -44,17 +44,14 @@ class LLMService:
             # Use conversation history for context if available
             context = self.conversation_history if self.conversation_history else None
             
-            # Enhance the prompt to encourage friendly, conversational responses
-            friendly_prompt = f"Please respond to this in a friendly, conversational way as if you're talking to a friend: {query}"
-            
             # Generate response from Ollama with optimized parameters
             response = ollama.generate(
                 model=self.model,
-                prompt=friendly_prompt,
+                prompt=query,
                 context=context[-MAX_HISTORY_LENGTH:] if context else None,
                 options={
                     "num_predict": 256,  # Limit token generation for faster responses
-                    "temperature": 0.75,  # Slightly higher temperature for more personality
+                    "temperature": 0.7,  # Slightly lower temperature for more focused responses
                     "top_k": 40,        # Limit vocabulary search space
                     "top_p": 0.9,       # Nucleus sampling parameter
                     "num_gpu": 1,        # Use GPU acceleration if available
@@ -79,14 +76,7 @@ class LLMService:
             return response['response']
         
         except Exception as e:
-            friendly_errors = [
-                f"Oops! I hit a snag: {str(e)}. Let me try again!",
-                f"Well that's embarrassing! I ran into an error: {str(e)}. Sorry about that!",
-                f"Even AI assistants make mistakes sometimes! Error: {str(e)}",
-                f"Hmm, that didn't work as expected. Error: {str(e)}. Let's try something else!"
-            ]
-            import random
-            return random.choice(friendly_errors)
+            return f"Sorry, I encountered an error: {str(e)}"
     
     def search_wikipedia(self, query, sentences=2):
         """
@@ -117,23 +107,9 @@ class LLMService:
             str: A joke
         """
         try:
-            joke = pyjokes.get_joke()
-            
-            # Add occasional follow-up comments to jokes for personality
-            import random
-            if random.random() < 0.4:  # 40% chance to add a follow-up
-                follow_ups = [
-                    " I've been working on my comedy routine!",
-                    " Did that make you laugh? I hope so!",
-                    " I know, I know, I should stick to my day job!",
-                    " That one always cracks me up!",
-                    " Too cheesy? I have plenty more where that came from!"
-                ]
-                joke += random.choice(follow_ups)
-                
-            return joke
+            return pyjokes.get_joke()
         except Exception as e:
-            return "I seem to have forgotten all my jokes! Must be a case of artificial amnesia!"
+            return f"Sorry, I couldn't think of a joke right now: {str(e)}"
     
     def clear_history(self):
         """
