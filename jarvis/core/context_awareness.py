@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import threading
 
-class ContextManager:
+class ContextAwareness:
     """
     Manages contextual information about the user's environment and activities.
     Enables proactive assistance based on patterns and contextual information.

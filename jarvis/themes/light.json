@@ -1,25 +1,25 @@
 {
-  "name": "Dark",
-  "description": "Default dark theme with blue accents",
+  "name": "Light",
+  "description": "Light theme with blue accents",
   "colors": {
-    "bg_dark": "#0a1622",
-    "bg_medium": "#162231",
-    "bg_gradient_top": "#0d1a29",
-    "bg_gradient_bottom": "#1e2b3a",
-    "accent": "#00a8ff",
-    "accent_glow": "#00d2ff",
-    "accent_secondary": "#7b42ff",
-    "text": "#ffffff",
-    "text_dim": "#a0b8d0",
-    "success": "#00e676",
-    "warning": "#ff9100",
-    "error": "#ff5252"
+    "bg_dark": "#f0f4f8",
+    "bg_medium": "#e1e8f0",
+    "bg_gradient_top": "#f5f9ff",
+    "bg_gradient_bottom": "#e1e8f0",
+    "accent": "#0078d4",
+    "accent_glow": "#00a2ff",
+    "accent_secondary": "#6b2ebb",
+    "text": "#1a1a1a",
+    "text_dim": "#555555",
+    "success": "#00b248",
+    "warning": "#d06a00",
+    "error": "#d32f2f"
   },
   "animation": {
-    "intensity": 1.0,
-    "complexity": 1.0,
-    "particle_count": 50,
-    "wave_complexity": 1.0
+    "intensity": 0.8,
+    "complexity": 0.9,
+    "particle_count": 40,
+    "wave_complexity": 0.9
   },
   "fonts": {
     "title": {

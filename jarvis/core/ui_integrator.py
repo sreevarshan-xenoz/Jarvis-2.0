@@ -57,7 +57,24 @@ class UIIntegrator:
         
         # Setup UI controls for feature toggling
         self.ui_controls = {}
+        
+        # Create basic UI frame for controls
+        self._setup_control_frame()
     
+    def _setup_control_frame(self):
+        """
+        Setup the basic UI frame for controls.
+        """
+        if not hasattr(self.display, 'root') or not self.display.root:
+            return
+            
+        # Create main control frame
+        control_frame = tk.Frame(self.display.root)
+        control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
+        
+        # Store the control frame
+        self.ui_controls['settings_frame'] = control_frame
+        
     def initialize(self):
         """
         Initialize all enhanced UI features.

@@ -1,0 +1,16 @@
+{
+  "name": "User",
+  "voice_id": 0,
+  "preferences": {
+    "wake_word": "jarvis",
+    "theme": "dark",
+    "volume": 75,
+    "speaking_rate": 180,
+    "favorite_sites": [],
+    "favorite_apps": []
+  },
+  "interaction_history": [],
+  "frequent_commands": {},
+  "created_at": "2025-04-07T15:09:06.440934",
+  "last_interaction": null
+}

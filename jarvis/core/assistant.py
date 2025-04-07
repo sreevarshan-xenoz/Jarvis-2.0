@@ -17,12 +17,29 @@ class JarvisAssistant:
     command processing, and response generation.
     """
     
-    def __init__(self):
+    def __init__(self, theme_manager=None, profile_manager=None, dataset_manager=None,
+                 display=None, ui_integrator=None, gesture_recognition=None, context_awareness=None):
         """
-        Initialize the Jarvis assistant with speech engine and command handler.
+        Initialize the Jarvis assistant with all core components.
+
+        Args:
+            theme_manager: ThemeManager instance for UI theming
+            profile_manager: ProfileManager for user profiles
+            dataset_manager: DatasetManager for handling datasets
+            display: EnhancedAnimatedDisplay for visual feedback
+            ui_integrator: UIIntegrator for UI coordination
+            gesture_recognition: GestureRecognizer for gesture commands
+            context_awareness: ContextAwareness for situational awareness
         """
         self.speech_engine = SpeechEngine()
         self.command_handler = CommandHandler(self.speech_engine)
+        self.theme_manager = theme_manager
+        self.profile_manager = profile_manager
+        self.dataset_manager = dataset_manager
+        self.display = display
+        self.ui_integrator = ui_integrator
+        self.gesture_recognition = gesture_recognition
+        self.context_awareness = context_awareness
         self.is_active = False
         self.conversation_active = False
         self.last_interaction_time = 0

@@ -1,0 +1,51 @@
+{
+  "name": "High Contrast",
+  "description": "High contrast theme for accessibility",
+  "colors": {
+    "bg_dark": "#000000",
+    "bg_medium": "#0a0a0a",
+    "bg_gradient_top": "#000000",
+    "bg_gradient_bottom": "#0a0a0a",
+    "accent": "#ffff00",
+    "accent_glow": "#ffff00",
+    "accent_secondary": "#ffffff",
+    "text": "#ffffff",
+    "text_dim": "#cccccc",
+    "success": "#00ff00",
+    "warning": "#ffaa00",
+    "error": "#ff0000"
+  },
+  "animation": {
+    "intensity": 0.7,
+    "complexity": 0.6,
+    "particle_count": 30,
+    "wave_complexity": 0.7
+  },
+  "fonts": {
+    "title": {
+      "family": "Segoe UI",
+      "size": 30,
+      "weight": "bold"
+    },
+    "subtitle": {
+      "family": "Segoe UI",
+      "size": 12,
+      "weight": "bold"
+    },
+    "text": {
+      "family": "Segoe UI",
+      "size": 14,
+      "weight": "normal"
+    },
+    "status": {
+      "family": "Segoe UI",
+      "size": 12,
+      "weight": "bold"
+    },
+    "footer": {
+      "family": "Segoe UI",
+      "size": 11,
+      "weight": "normal"
+    }
+  }
+}

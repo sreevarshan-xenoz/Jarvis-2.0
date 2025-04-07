@@ -1,0 +1,85 @@
+{
+    "name": "Cyberpunk Theme",
+    "description": "A vibrant cyberpunk theme with neon accents for Jarvis",
+    "colors": {
+        "bg_dark": "#0a0a12",
+        "bg_medium": "#12121f",
+        "bg_light": "#1a1a2f",
+        "text": "#ffffff",
+        "text_dim": "#7f7f9f",
+        "accent": "#00ff9f",
+        "success": "#00ffaa",
+        "warning": "#ff00aa",
+        "error": "#ff0055"
+    },
+    "opengl": {
+        "materials": {
+            "default": {
+                "ambient": [0.1, 0.1, 0.2, 1.0],
+                "diffuse": [0.4, 0.4, 0.8, 1.0],
+                "specular": [1.0, 1.0, 1.0, 1.0],
+                "shininess": 60.0
+            },
+            "blue_glow": {
+                "ambient": [0.0, 0.2, 0.3, 1.0],
+                "diffuse": [0.0, 0.6, 1.0, 1.0],
+                "specular": [0.0, 1.0, 1.0, 1.0],
+                "shininess": 85.0
+            },
+            "green_glow": {
+                "ambient": [0.0, 0.3, 0.2, 1.0],
+                "diffuse": [0.0, 1.0, 0.6, 1.0],
+                "specular": [0.0, 1.0, 0.8, 1.0],
+                "shininess": 85.0
+            },
+            "orange_glow": {
+                "ambient": [0.3, 0.1, 0.0, 1.0],
+                "diffuse": [1.0, 0.4, 0.0, 1.0],
+                "specular": [1.0, 0.6, 0.0, 1.0],
+                "shininess": 85.0
+            }
+        },
+        "lighting": {
+            "ambient": [0.15, 0.15, 0.25, 1.0],
+            "diffuse": [0.8, 0.8, 1.0, 1.0],
+            "specular": [1.0, 1.0, 1.2, 1.0],
+            "position": [0.0, 5.0, 5.0, 1.0]
+        }
+    },
+    "particles": {
+        "idle": {
+            "color": [0.0, 1.0, 0.6, 0.8],
+            "size_range": [2, 5],
+            "velocity_range": [-35, 35],
+            "lifetime_range": [1.2, 2.2],
+            "emission_rate": 60
+        },
+        "listening": {
+            "color": [0.0, 0.8, 1.0, 0.8],
+            "size_range": [3, 6],
+            "velocity_range": [-45, 45],
+            "lifetime_range": [1.8, 2.8],
+            "emission_rate": 90
+        },
+        "speaking": {
+            "color": [1.0, 0.0, 0.6, 0.8],
+            "size_range": [4, 7],
+            "velocity_range": [-55, 55],
+            "lifetime_range": [2.2, 3.2],
+            "emission_rate": 120
+        }
+    },
+    "audio_spectrum": {
+        "num_bands": 32,
+        "smoothing_factor": 0.35,
+        "peak_decay": 0.07,
+        "colors": {
+            "bars": "#00ff9f",
+            "peaks": "#ff00aa"
+        }
+    },
+    "fonts": {
+        "main": "Segoe UI",
+        "monospace": "Consolas"
+    }
+}

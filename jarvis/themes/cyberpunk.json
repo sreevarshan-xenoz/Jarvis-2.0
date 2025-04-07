@@ -22,10 +22,30 @@
     "wave_complexity": 1.4
   },
   "fonts": {
-    "title": {"family": "Segoe UI", "size": 28, "weight": "bold"},
-    "subtitle": {"family": "Segoe UI", "size": 11, "weight": "normal"},
-    "text": {"family": "Segoe UI", "size": 12, "weight": "normal"},
-    "status": {"family": "Segoe UI", "size": 11, "weight": "bold"},
-    "footer": {"family": "Segoe UI", "size": 10, "weight": "normal"}
+    "title": {
+      "family": "Segoe UI",
+      "size": 28,
+      "weight": "bold"
+    },
+    "subtitle": {
+      "family": "Segoe UI",
+      "size": 11,
+      "weight": "normal"
+    },
+    "text": {
+      "family": "Segoe UI",
+      "size": 12,
+      "weight": "normal"
+    },
+    "status": {
+      "family": "Segoe UI",
+      "size": 11,
+      "weight": "bold"
+    },
+    "footer": {
+      "family": "Segoe UI",
+      "size": 10,
+      "weight": "normal"
+    }
   }
 }
