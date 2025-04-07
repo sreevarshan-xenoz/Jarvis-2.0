@@ -70,6 +70,9 @@ class AnimatedDisplayWindow:
         self.root.configure(bg=self.color_scheme["bg_dark"])
         self.root.minsize(800, 600)  # Set minimum window size
         
+        # Initialize image resources
+        self.images = {}
+        
         # Create gradient background image
         self._create_gradient_background()
         

@@ -52,28 +52,24 @@ class UIIntegrator:
         self.opengl_renderer = None
         self.theme_manager = ThemeManager()
         
+        # Initialize UI controls dictionary
+        self.ui_controls = {}
+        
+        # Wait for display window to be ready
+        self.display.root.after(100, self._delayed_init)
+    
+    def _delayed_init(self):
+        """
+        Perform delayed initialization after display window is ready.
+        """
         # Apply initial theme
         self._apply_theme(self.theme_manager.get_theme())
         
-        # Setup UI controls for feature toggling
-        self.ui_controls = {}
-        
         # Create basic UI frame for controls
-        self._setup_control_frame()
-    
-    def _setup_control_frame(self):
-        """
-        Setup the basic UI frame for controls.
-        """
-        if not hasattr(self.display, 'root') or not self.display.root:
-            return
-            
-        # Create main control frame
-        control_frame = tk.Frame(self.display.root)
-        control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
-        
-        # Store the control frame
-        self.ui_controls['settings_frame'] = control_frame
+        if hasattr(self.display, 'root') and self.display.root:
+            control_frame = tk.Frame(self.display.root)
+            control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
+            self.ui_controls['settings_frame'] = control_frame
         
     def initialize(self):
         """
