@@ -41,14 +41,18 @@ class LLMService:
                 print("Using cached response")
                 return self.response_cache[cache_key]
             
-            # Use conversation history for context if available
-            context = self.conversation_history if self.conversation_history else None
+            # Format conversation history for context
+            context = None
+            if self.conversation_history:
+                # Convert history tuples to token integers for context
+                context = [int(ord(c)) for pair in self.conversation_history[-MAX_HISTORY_LENGTH:] 
+                          for c in pair[0] + pair[1]]
             
             # Generate response from Ollama with optimized parameters
             response = ollama.generate(
                 model=self.model,
                 prompt=query,
-                context=context[-MAX_HISTORY_LENGTH:] if context else None,
+                context=context,
                 options={
                     "num_predict": 256,  # Limit token generation for faster responses
                     "temperature": 0.7,  # Slightly lower temperature for more focused responses

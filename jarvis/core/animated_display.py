@@ -33,11 +33,18 @@ class AnimatedDisplayWindow:
         self.is_running = False
         self.window_thread = None
         self.animation_active = False
-        self.wave_points = []
+        self.particles = []
         self.animation_intensity = 0
         self.animation_fade_speed = 0.05
         self.animation_state = "idle"  # idle, listening, speaking
         self.status_indicator = None  # Initialize status_indicator attribute
+        
+        # Particle system parameters
+        self.max_particles = 50
+        self.particle_spawn_rate = 2  # Particles per frame
+        self.particle_lifetime = 2.0  # Seconds
+        self.particle_size_range = (2, 6)
+        self.particle_speed_range = (1, 3)
         
         # Animation state properties with enhanced dynamics
         self.state_properties = {
@@ -179,15 +186,6 @@ class AnimatedDisplayWindow:
             self.canvas_width = self.canvas.winfo_reqwidth() or 900
             self.canvas_height = self.canvas.winfo_reqheight() or 220
             
-            # Create wave points - optimized
-            num_points = 120
-            self.wave_points = [{
-                "x": i * (self.canvas_width / (num_points - 1)),
-                "y": self.canvas_height / 2,
-                "speed": 0.1,
-                "phase": random.random() * math.pi * 2
-            } for i in range(num_points)]
-            
             # Create central orb
             center_x = self.canvas_width / 2
             center_y = self.canvas_height / 2
@@ -285,76 +283,83 @@ class AnimatedDisplayWindow:
             self.canvas.itemconfig(self.inner_glow, outline=glow_color)
             self.canvas.itemconfig(self.outer_glow, outline=outer_color)
             
-            # Update wave points
+            # Update particles
             t = time.time()
             
-            # Clear previous wave
-            self.canvas.delete("wave")
+            # Clear previous particles
+            self.canvas.delete("particle")
             
             # Get current state properties
             state = self.animation_state if self.animation_state in self.state_properties else "idle"
             state_props = self.state_properties[state]
             
-            # Draw wave
-            points = []
-            for point in self.wave_points:
-                # Calculate y position with enhanced sinusoidal components
-                wave_freq = state_props["wave_frequency"]
-                ripple_intensity = state_props["ripple_intensity"]
-                
-                # Primary sinusoidal wave with dynamic phase
-                base_wave = math.sin(t * point["speed"] * wave_freq + point["phase"])
-                
-                # Secondary waves with varying frequencies and phases
-                wave2 = math.sin(t * 1.5 * point["speed"] * wave_freq + point["phase"] * 0.5) * 0.7
-                wave3 = math.sin(t * 0.75 * point["speed"] * wave_freq - point["phase"] * 0.3) * 0.5
-                
-                # Smooth ripple effect
-                ripple = math.sin(t * 2 * point["speed"] * wave_freq + point["phase"] * 2) * ripple_intensity * 0.8
-                
-                # Subtle harmonic motion
-                harmonic = math.cos(t * 3 * point["speed"] * wave_freq - point["phase"]) * (ripple_intensity * 0.3)
-                
-                # High-frequency flutter for organic movement
-                flutter = math.sin(t * 4 * point["speed"] + point["phase"] * 1.5) * (ripple_intensity * 0.15)
-                
-                # Combine all wave components with weighted influence
-                wave_height = (base_wave * 1.2 + wave2 + wave3 + ripple + harmonic + flutter) * \
-                    state_props["wave_amplitude"] * \
-                    self.animation_intensity
-                
-                y = point["y"] + wave_height
-                points.extend([point["x"], y])
+            # Spawn new particles when speaking
+            if state == "speaking":
+                for _ in range(self.particle_spawn_rate):
+                    if len(self.particles) < self.max_particles:
+                        angle = random.uniform(0, 2 * math.pi)
+                        speed = random.uniform(*self.particle_speed_range)
+                        size = random.uniform(*self.particle_size_range)
+                        self.particles.append({
+                            "x": center_x,
+                            "y": center_y,
+                            "vx": math.cos(angle) * speed,
+                            "vy": math.sin(angle) * speed,
+                            "size": size,
+                            "birth_time": t,
+                            "lifetime": self.particle_lifetime
+                        })
             
-            # Draw main wave
-            if len(points) >= 4:
-                # Create gradient effect with multiple lines
-                alpha = 0.8
-                for i in range(3):
-                    offset = i * 2
-                    width = 3 - i * 0.8
+            # Update and draw particles
+            new_particles = []
+            for particle in self.particles:
+                age = t - particle["birth_time"]
+                if age < particle["lifetime"]:
+                    # Update position with some attraction to center
+                    dx = center_x - particle["x"]
+                    dy = center_y - particle["y"]
+                    dist = math.sqrt(dx*dx + dy*dy)
+                    if dist > 0:
+                        attraction = 0.1  # Strength of attraction to center
+                        particle["vx"] += (dx/dist) * attraction
+                        particle["vy"] += (dy/dist) * attraction
                     
-                    # Adjust points for parallel waves
-                    wave_points = points.copy()
-                    for j in range(1, len(wave_points), 2):
-                        wave_points[j] += offset
+                    particle["x"] += particle["vx"]
+                    particle["y"] += particle["vy"]
                     
-                    # Convert color to RGBA format for transparency
+                    # Calculate opacity based on age
+                    life_ratio = 1 - (age / particle["lifetime"])
+                    
+                    # Draw particle with glow effect
+                    size = particle["size"] * life_ratio
+                    x, y = particle["x"], particle["y"]
+                    
+                    # Create particle with glow effect
                     color = state_props["color"]
-                    r = int(color[1:3], 16)
-                    g = int(color[3:5], 16)
-                    b = int(color[5:7], 16)
-                    alpha_hex = int(alpha * 255)
-                    rgba_color = f"#{r:02x}{g:02x}{b:02x}{alpha_hex:02x}"
+                    glow_color = self._adjust_color_brightness(color, 1.2)
                     
-                    self.canvas.create_line(
-                        wave_points,
-                        smooth=True,
-                        fill=rgba_color,
-                        width=width,
-                        tags="wave"
+                    # Outer glow
+                    self.canvas.create_oval(
+                        x - size*1.5, y - size*1.5,
+                        x + size*1.5, y + size*1.5,
+                        fill="",
+                        outline=glow_color,
+                        width=1,
+                        tags="particle"
                     )
-                    alpha *= 0.6
+                    
+                    # Inner particle
+                    self.canvas.create_oval(
+                        x - size, y - size,
+                        x + size, y + size,
+                        fill=color,
+                        outline="",
+                        tags="particle"
+                    )
+                    
+                    new_particles.append(particle)
+            
+            self.particles = new_particles
             
             # Update circle glow
             if hasattr(self, "center_circle") and hasattr(self, "glow_circle"):

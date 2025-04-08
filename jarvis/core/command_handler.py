@@ -150,9 +150,10 @@ class CommandHandler:
         elif 'exit' in command or 'goodbye' in command or 'bye' in command:
             self.speech_engine.speak("Goodbye!")
             # Stop the speech engine's display window first
-            self.speech_engine.display_window.stop()
-            # Then exit the program
-            exit()
+            if hasattr(self.speech_engine, 'display_window') and self.speech_engine.display_window:
+                self.speech_engine.display_window.stop()
+            # Signal main loop to stop
+            return False
         
         # Default: Ask LLM
         else:
