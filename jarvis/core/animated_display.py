@@ -201,6 +201,23 @@ class AnimatedDisplayWindow:
             self.base_radius = 60  # Increased from 45 to 60
             self.pulse_phase = 0
             
+            # Core glow (new)
+            self.core_glow = self.canvas.create_oval(
+                center_x - self.base_radius * 0.3, center_y - self.base_radius * 0.3,
+                center_x + self.base_radius * 0.3, center_y + self.base_radius * 0.3,
+                outline="",
+                fill=self._adjust_color_brightness(self.state_properties["idle"]["color"], 1.4),
+                stipple="gray50"
+            )
+            
+            # Core (new)
+            self.core = self.canvas.create_oval(
+                center_x - self.base_radius * 0.2, center_y - self.base_radius * 0.2,
+                center_x + self.base_radius * 0.2, center_y + self.base_radius * 0.2,
+                outline="",
+                fill=self._adjust_color_brightness(self.state_properties["idle"]["color"], 1.6)
+            )
+            
             # Main orb
             self.center_circle = self.canvas.create_oval(
                 center_x - self.base_radius, center_y - self.base_radius,
@@ -262,6 +279,19 @@ class AnimatedDisplayWindow:
             center_y = self.canvas_height / 2
             current_radius = self.base_radius * combined_scale
             
+            # Update core with pulsing effect
+            core_pulse = 1 + math.sin(self.pulse_phase * 2) * 0.2 * self.animation_intensity
+            core_radius = self.base_radius * 0.2 * core_pulse
+            core_glow_radius = self.base_radius * 0.3 * core_pulse
+            
+            self.canvas.coords(self.core,
+                center_x - core_radius, center_y - core_radius,
+                center_x + core_radius, center_y + core_radius)
+            
+            self.canvas.coords(self.core_glow,
+                center_x - core_glow_radius, center_y - core_glow_radius,
+                center_x + core_glow_radius, center_y + core_glow_radius)
+            
             # Update orb and glows
             self.canvas.coords(self.center_circle,
                 center_x - current_radius, center_y - current_radius,
@@ -291,6 +321,12 @@ class AnimatedDisplayWindow:
             glow_color = self._adjust_color_brightness(color, 1 + pulse_color_mod)
             outer_color = self._adjust_color_brightness(color, 1 - pulse_color_mod)
             
+            # Update core colors with enhanced brightness
+            core_color = self._adjust_color_brightness(base_color, 1.6 + pulse_color_mod * 0.4)
+            core_glow_color = self._adjust_color_brightness(base_color, 1.4 + pulse_color_mod * 0.3)
+            
+            self.canvas.itemconfig(self.core, fill=core_color)
+            self.canvas.itemconfig(self.core_glow, fill=core_glow_color)
             self.canvas.itemconfig(self.center_circle, outline=base_color)
             self.canvas.itemconfig(self.inner_glow, outline=glow_color)
             self.canvas.itemconfig(self.outer_glow, outline=outer_color)

@@ -167,6 +167,40 @@ class SystemService:
             print(f"Error closing application: {str(e)}")
             return False
     
+    def get_system_status(self):
+        """
+        Get current system status including CPU, memory, and disk usage.
+        
+        Returns:
+            str: A formatted string containing system status information
+        """
+        try:
+            # Get CPU usage
+            cpu_percent = psutil.cpu_percent(interval=1)
+            
+            # Get memory usage
+            memory = psutil.virtual_memory()
+            memory_percent = memory.percent
+            memory_used = round(memory.used / (1024 * 1024 * 1024), 2)  # Convert to GB
+            memory_total = round(memory.total / (1024 * 1024 * 1024), 2)  # Convert to GB
+            
+            # Get disk usage
+            disk = psutil.disk_usage('/')
+            disk_percent = disk.percent
+            disk_used = round(disk.used / (1024 * 1024 * 1024), 2)  # Convert to GB
+            disk_total = round(disk.total / (1024 * 1024 * 1024), 2)  # Convert to GB
+            
+            status = (
+                f"CPU usage: {cpu_percent}%, "
+                f"Memory: {memory_used}GB/{memory_total}GB ({memory_percent}%), "
+                f"Disk: {disk_used}GB/{disk_total}GB ({disk_percent}%)"
+            )
+            return status
+            
+        except Exception as e:
+            print(f"Error getting system status: {str(e)}")
+            return "Unable to retrieve system status"
+    
     def close_browser_tab(self, tab_name):
         """
         Close a specific browser tab by its name.

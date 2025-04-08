@@ -48,8 +48,35 @@ class CommandHandler:
         """
         print(f"Processing command: {command}")
         
+        # Basic interaction commands
+        if any(word in command.lower() for word in ['hello', 'hi', 'hey']):  # Greetings
+            self.speech_engine.speak('Hello! How can I help you today?')
+            
+        elif any(word in command.lower() for word in ['how are you', 'how\'re you']):  # Status query
+            self.speech_engine.speak('I\'m functioning well and ready to assist you!')
+            
+        elif 'help' in command.lower():  # Help command
+            help_text = (
+                'I can help you with various tasks like:\n'
+                '- Playing music ("play [song name]")\n'
+                '- Checking weather ("weather in [city]")\n'
+                '- Getting news ("tell me the news")\n'
+                '- Searching the web ("search for [query]")\n'
+                '- Controlling volume ("volume up/down")\n'
+                '- Opening websites ("open [website]")\n'
+                '- Closing applications ("close [app]")\n'
+                '- Telling time ("what\'s the time")\n'
+                'Feel free to ask me anything!'
+            )
+            self.speech_engine.speak(help_text)
+            
+        # System status commands
+        elif any(phrase in command.lower() for phrase in ['system status', 'status report']):  # System status
+            status = self.system_service.get_system_status()
+            self.speech_engine.speak(f'System status: {status}')
+            
         # Media commands
-        if 'play' in command:
+        elif 'play' in command:
             song = command.replace('play', '').strip()
             self.speech_engine.speak(f'Playing {song}')
             self.media_service.play_youtube(song)
@@ -82,6 +109,14 @@ class CommandHandler:
             self.speech_engine.speak(news)
         
         # Volume commands
+        elif any(phrase in command.lower() for phrase in ['mute', 'silence']):  # Mute
+            self.system_service.mute()
+            self.speech_engine.speak('Audio muted')
+            
+        elif any(phrase in command.lower() for phrase in ['unmute', 'sound on']):  # Unmute
+            self.system_service.unmute()
+            self.speech_engine.speak('Audio unmuted')
+            
         elif 'volume up' in command:
             self.system_service.volume_up()
             self.speech_engine.speak('Increasing volume')
