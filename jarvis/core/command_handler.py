@@ -147,7 +147,7 @@ class CommandHandler:
             self.speech_engine.speak("Website not in my database")
         
         # Exit commands
-        elif 'exit' in command or 'goodbye' in command or 'bye' in command:
+        elif command.strip().lower() in ['exit', 'quit'] or 'exit' in command or 'goodbye' in command or 'bye' in command:
             self.speech_engine.speak("Goodbye!")
             # Stop the speech engine's display window first
             if hasattr(self.speech_engine, 'display_window') and self.speech_engine.display_window:

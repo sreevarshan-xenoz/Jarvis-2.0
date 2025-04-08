@@ -41,11 +41,17 @@ class AnimatedDisplayWindow:
         
         # Particle system parameters
         self.max_particles = 50
+        self.max_core_particles = 20  # Maximum particles in the core
         self.particle_spawn_rate = 2  # Particles per frame
-        self.particle_lifetime = 3.0  # Seconds
-        self.particle_size_range = (2, 6)
-        self.particle_speed_range = (1, 3)
-        self.particle_rotation_speed = 0.02  # Rotation speed in radians
+        self.core_spawn_rate = 1  # Core particles per frame
+        self.particle_lifetime = 2.0  # Reduced from 3.0 to 2.0 for better containment
+        self.core_lifetime = 3.0  # Core particles last longer
+        self.particle_size_range = (2, 4)  # Reduced max size from 6 to 4
+        self.core_size_range = (1, 3)  # Smaller particles for core
+        self.particle_speed_range = (0.5, 1.5)  # Reduced speed for smoother movement
+        self.core_speed_range = (0.3, 0.8)  # Slower movement for core particles
+        self.particle_rotation_speed = 0.015  # Slightly reduced rotation speed
+        self.core_rotation_speed = 0.02  # Faster rotation for core particles
         self.breathing_phase = 0
         self.breathing_speed = 0.03  # Speed of breathing effect
         
@@ -192,7 +198,7 @@ class AnimatedDisplayWindow:
             # Create central orb
             center_x = self.canvas_width / 2
             center_y = self.canvas_height / 2
-            self.base_radius = 45
+            self.base_radius = 60  # Increased from 45 to 60
             self.pulse_phase = 0
             
             # Main orb
@@ -299,6 +305,26 @@ class AnimatedDisplayWindow:
             state = self.animation_state if self.animation_state in self.state_properties else "idle"
             state_props = self.state_properties[state]
             
+            # Spawn core particles continuously
+            for _ in range(self.core_spawn_rate):
+                if len([p for p in self.particles if p.get("is_core", False)]) < self.max_core_particles:
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(*self.core_speed_range)
+                    size = random.uniform(*self.core_size_range)
+                    orbit_radius = random.uniform(10, self.base_radius * 0.4)  # Keep core particles closer to center
+                    orbit_speed = random.uniform(0.8, 1.2) * self.core_rotation_speed
+                    self.particles.append({
+                        "x": center_x,
+                        "y": center_y,
+                        "angle": angle,
+                        "orbit_radius": orbit_radius,
+                        "orbit_speed": orbit_speed,
+                        "size": size,
+                        "birth_time": t,
+                        "lifetime": self.core_lifetime,
+                        "is_core": True
+                    })
+            
             # Spawn new particles when speaking
             if state == "speaking":
                 for _ in range(self.particle_spawn_rate):
@@ -306,8 +332,8 @@ class AnimatedDisplayWindow:
                         angle = random.uniform(0, 2 * math.pi)
                         speed = random.uniform(*self.particle_speed_range)
                         size = random.uniform(*self.particle_size_range)
-                        orbit_radius = random.uniform(60, 120)  # Distance from center
-                        orbit_speed = random.uniform(0.5, 1.5) * self.particle_rotation_speed
+                        orbit_radius = random.uniform(30, self.base_radius * 0.7)  # Keep particles within orb bounds
+                        orbit_speed = random.uniform(0.5, 1.0) * self.particle_rotation_speed
                         self.particles.append({
                             "x": center_x,
                             "y": center_y,
@@ -328,8 +354,9 @@ class AnimatedDisplayWindow:
                     particle["angle"] += particle["orbit_speed"]
                     
                     # Calculate new position based on orbital motion
-                    particle["x"] = center_x + math.cos(particle["angle"]) * particle["orbit_radius"]
-                    particle["y"] = center_y + math.sin(particle["angle"]) * particle["orbit_radius"]
+                    # Reduced orbit_radius range to keep particles inside the orb
+                    particle["x"] = center_x + math.cos(particle["angle"]) * (self.base_radius * 0.8)
+                    particle["y"] = center_y + math.sin(particle["angle"]) * (self.base_radius * 0.8)
                     
                     # Add subtle random movement
                     particle["x"] += random.uniform(-0.5, 0.5)
@@ -344,7 +371,13 @@ class AnimatedDisplayWindow:
                     
                     # Create particle with glow effect
                     color = state_props["color"]
-                    glow_color = self._adjust_color_brightness(color, 1.2)
+                    
+                    # Adjust color based on particle type
+                    if particle.get("is_core", False):
+                        color = self._adjust_color_brightness(color, 1.4)  # Brighter core particles
+                        glow_color = self._adjust_color_brightness(color, 1.3)
+                    else:
+                        glow_color = self._adjust_color_brightness(color, 1.2)
                     
                     # Outer glow
                     self.canvas.create_oval(
@@ -472,9 +505,14 @@ class AnimatedDisplayWindow:
     
     def stop(self):
         """
-        Stop the display window.
+        Stop the display window and cleanup resources.
         """
         self.is_running = False
+        self.animation_active = False
+        self.particles.clear()
         if self.root:
-            self.root.quit()
-            self.root.destroy()
+            try:
+                self.root.quit()
+                self.root.destroy()
+            except Exception as e:
+                print(f"Error during window cleanup: {e}")
