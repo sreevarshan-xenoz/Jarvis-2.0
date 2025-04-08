@@ -42,9 +42,12 @@ class AnimatedDisplayWindow:
         # Particle system parameters
         self.max_particles = 50
         self.particle_spawn_rate = 2  # Particles per frame
-        self.particle_lifetime = 2.0  # Seconds
+        self.particle_lifetime = 3.0  # Seconds
         self.particle_size_range = (2, 6)
         self.particle_speed_range = (1, 3)
+        self.particle_rotation_speed = 0.02  # Rotation speed in radians
+        self.breathing_phase = 0
+        self.breathing_speed = 0.03  # Speed of breathing effect
         
         # Animation state properties with enhanced dynamics
         self.state_properties = {
@@ -241,14 +244,17 @@ class AnimatedDisplayWindow:
             elif self.animation_intensity > target_intensity:
                 self.animation_intensity = max(target_intensity, self.animation_intensity - self.animation_fade_speed)
             
-            # Update pulse effect
+            # Update pulse and breathing effects
             self.pulse_phase += state_props["pulse_speed"]
+            self.breathing_phase += self.breathing_speed
             pulse_scale = 1 + math.sin(self.pulse_phase) * 0.1 * self.animation_intensity
+            breathing_scale = 1 + math.sin(self.breathing_phase) * 0.15 * self.animation_intensity
+            combined_scale = pulse_scale * breathing_scale
             
             # Calculate orb dimensions
             center_x = self.canvas_width / 2
             center_y = self.canvas_height / 2
-            current_radius = self.base_radius * pulse_scale
+            current_radius = self.base_radius * combined_scale
             
             # Update orb and glows
             self.canvas.coords(self.center_circle,
@@ -300,11 +306,14 @@ class AnimatedDisplayWindow:
                         angle = random.uniform(0, 2 * math.pi)
                         speed = random.uniform(*self.particle_speed_range)
                         size = random.uniform(*self.particle_size_range)
+                        orbit_radius = random.uniform(60, 120)  # Distance from center
+                        orbit_speed = random.uniform(0.5, 1.5) * self.particle_rotation_speed
                         self.particles.append({
                             "x": center_x,
                             "y": center_y,
-                            "vx": math.cos(angle) * speed,
-                            "vy": math.sin(angle) * speed,
+                            "angle": angle,
+                            "orbit_radius": orbit_radius,
+                            "orbit_speed": orbit_speed,
                             "size": size,
                             "birth_time": t,
                             "lifetime": self.particle_lifetime
@@ -315,17 +324,16 @@ class AnimatedDisplayWindow:
             for particle in self.particles:
                 age = t - particle["birth_time"]
                 if age < particle["lifetime"]:
-                    # Update position with some attraction to center
-                    dx = center_x - particle["x"]
-                    dy = center_y - particle["y"]
-                    dist = math.sqrt(dx*dx + dy*dy)
-                    if dist > 0:
-                        attraction = 0.1  # Strength of attraction to center
-                        particle["vx"] += (dx/dist) * attraction
-                        particle["vy"] += (dy/dist) * attraction
+                    # Update particle position with orbital motion
+                    particle["angle"] += particle["orbit_speed"]
                     
-                    particle["x"] += particle["vx"]
-                    particle["y"] += particle["vy"]
+                    # Calculate new position based on orbital motion
+                    particle["x"] = center_x + math.cos(particle["angle"]) * particle["orbit_radius"]
+                    particle["y"] = center_y + math.sin(particle["angle"]) * particle["orbit_radius"]
+                    
+                    # Add subtle random movement
+                    particle["x"] += random.uniform(-0.5, 0.5)
+                    particle["y"] += random.uniform(-0.5, 0.5)
                     
                     # Calculate opacity based on age
                     life_ratio = 1 - (age / particle["lifetime"])
