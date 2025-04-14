@@ -48,14 +48,17 @@ class LLMService:
                 context = [int(ord(c)) for pair in self.conversation_history[-MAX_HISTORY_LENGTH:] 
                           for c in pair[0] + pair[1]]
             
+            # Format the query to ensure we get a proper response from the local model
+            formatted_query = f"Please provide a direct and informative answer to this question: {query}"
+            
             # Generate response from Ollama with optimized parameters
             response = ollama.generate(
                 model=self.model,
-                prompt=query,
+                prompt=formatted_query,
                 context=context,
                 options={
-                    "num_predict": 256,  # Limit token generation for faster responses
-                    "temperature": 0.7,  # Slightly lower temperature for more focused responses
+                    "num_predict": 512,  # Increased token limit for more complete answers
+                    "temperature": 0.5,  # Lower temperature for more factual responses
                     "top_k": 40,        # Limit vocabulary search space
                     "top_p": 0.9,       # Nucleus sampling parameter
                     "num_gpu": 1,        # Use GPU acceleration if available
@@ -63,8 +66,11 @@ class LLMService:
                 }
             )
             
+            # Process the response to ensure it's relevant and concise
+            model_response = response['response'].strip()
+            
             # Update conversation history
-            self.conversation_history.append((query, response['response']))
+            self.conversation_history.append((query, model_response))
             
             # Trim conversation history if needed
             if len(self.conversation_history) > MAX_HISTORY_LENGTH * 2:
@@ -75,9 +81,9 @@ class LLMService:
                 # Remove oldest item if cache is full
                 oldest_key = next(iter(self.response_cache))
                 self.response_cache.pop(oldest_key)
-            self.response_cache[cache_key] = response['response']
+            self.response_cache[cache_key] = model_response
             
-            return response['response']
+            return model_response
         
         except Exception as e:
             return f"Sorry, I encountered an error: {str(e)}"
