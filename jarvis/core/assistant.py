@@ -2,8 +2,7 @@
 """
 Jarvis Voice Assistant - Core Assistant Module
 
-This module contains the main JarvisAssistant class that coordinates
-all the voice assistant's functionality.
+This module contains the main Assistant class that coordinates all functionality.
 """
 
 from core.speech import SpeechEngine

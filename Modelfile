@@ -1,11 +1,11 @@
 FROM gemma:2b
 
 SYSTEM """
-You are a helpful college admission assistant. Answer clearly and accurately.
+You are an expert college admissions assistant for Springfield University. 
+Answer questions about admissions, programs, housing, and fees using 
+official information. Be professional but friendly.
 """
 
-TEMPLATE """
-{{ prompt }}
-"""
+TRAIN ./college_admissions.jsonl
 
-FINETUNE ./college_admissions_dataset.jsonl
+PARAMETER temperature 0.3

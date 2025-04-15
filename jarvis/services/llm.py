@@ -8,7 +8,8 @@ This module handles interactions with Ollama for AI responses.
 import ollama
 import wikipedia
 import pyjokes
-from config.settings import OLLAMA_MODEL, MAX_HISTORY_LENGTH
+import re
+from config.settings import OLLAMA_MODEL, OLLAMA_CUSTOM_MODELS, MAX_HISTORY_LENGTH
 
 class LLMService:
     """
@@ -19,10 +20,73 @@ class LLMService:
         """
         Initialize the LLM service.
         """
-        self.model = OLLAMA_MODEL
+        self.default_model = OLLAMA_MODEL
+        self.model = self.default_model
+        self.custom_models = OLLAMA_CUSTOM_MODELS
         self.conversation_history = []
         self.response_cache = {}  # Cache for common queries
         self.cache_size_limit = 50  # Maximum number of cached responses
+        
+        # Check if custom models are available
+        self.available_models = self._get_available_models()
+    
+    def _get_available_models(self):
+        """
+        Get a list of available models from Ollama.
+        
+        Returns:
+            list: List of available model names
+        """
+        try:
+            models = ollama.list()
+            return [model['name'] for model in models.get('models', [])]
+        except Exception as e:
+            print(f"Error getting available models: {e}")
+            return []
+    
+    def _select_model_for_query(self, query):
+        """
+        Select the appropriate model based on the query content.
+        
+        Args:
+            query (str): The user's query
+            
+        Returns:
+            str: The model name to use
+        """
+        query_lower = query.lower()
+        
+        # Check if any custom model should be used based on keywords
+        for model_name, model_info in self.custom_models.items():
+            # Skip if model is not available in Ollama
+            if model_name not in self.available_models:
+                continue
+                
+            # Check if query contains any of the default keywords for this model
+            default_keywords = model_info.get('default_for', [])
+            if any(keyword in query_lower for keyword in default_keywords):
+                return model_name
+            
+            # Enhanced detection for college-related queries
+            if model_name == 'college-assistant':
+                # Check for common college-related terms and questions
+                college_patterns = [
+                    r'fee(s)?', r'tuition', r'scholarship', r'financial aid',
+                    r'admission', r'enroll(ment)?', r'course(s)?', r'program(s)?',
+                    r'major(s)?', r'degree(s)?', r'campus', r'dorm', r'housing',
+                    r'student(s)?', r'faculty', r'professor(s)?', r'class(es)?',
+                    r'semester', r'quarter', r'academic', r'study', r'college',
+                    r'university', r'school', r'education', r'learn(ing)?',
+                    r'apply(ing)?', r'application', r'deadline', r'requirement(s)?',
+                    r'test(s)?', r'exam(s)?', r'sat', r'act', r'gpa', r'grade(s)?'
+                ]
+                
+                # Check if query matches any college-related pattern
+                if any(re.search(pattern, query_lower) for pattern in college_patterns):
+                    return model_name
+        
+        # Default to the standard model
+        return self.default_model
     
     def ask(self, query):
         """
@@ -48,12 +112,15 @@ class LLMService:
                 context = [int(ord(c)) for pair in self.conversation_history[-MAX_HISTORY_LENGTH:] 
                           for c in pair[0] + pair[1]]
             
+            # Select the appropriate model for this query
+            selected_model = self._select_model_for_query(query)
+            
             # Format the query to ensure we get a proper response from the local model
             formatted_query = f"Please provide a direct and informative answer to this question: {query}"
             
             # Generate response from Ollama with optimized parameters
             response = ollama.generate(
-                model=self.model,
+                model=selected_model,
                 prompt=formatted_query,
                 context=context,
                 options={

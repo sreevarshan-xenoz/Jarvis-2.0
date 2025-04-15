@@ -20,6 +20,12 @@ NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 
 # Ollama settings
 OLLAMA_MODEL = 'gemma:2b'
+OLLAMA_CUSTOM_MODELS = {
+    'college-assistant': {
+        'description': 'Specialized model for college admissions assistance',
+        'default_for': ['college', 'admission', 'university', 'application']
+    }
+}
 
 # Website shortcuts
 WEBSITES = {
