@@ -1,0 +1,11 @@
+FROM gemma:2b
+
+SYSTEM """
+You are a helpful college admission assistant. Answer clearly and accurately.
+"""
+
+TEMPLATE """
+{{ prompt }}
+"""
+
+FINETUNE ./college_admissions_dataset.jsonl
