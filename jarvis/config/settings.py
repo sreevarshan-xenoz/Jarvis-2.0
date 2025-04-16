@@ -27,6 +27,9 @@ OLLAMA_CUSTOM_MODELS = {
     }
 }
 
+# RAG settings
+USE_RAG_FOR_COLLEGE = True  # Set to False to disable RAG for college queries
+
 # Website shortcuts
 WEBSITES = {
     'youtube': 'https://youtube.com',

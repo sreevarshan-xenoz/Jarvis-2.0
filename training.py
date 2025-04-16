@@ -1,145 +1,143 @@
 import requests
-import json
-import time
 import os
+import shutil
+import time
+import subprocess
+import json
 
 def fine_tune_model():
-    """Fine-tune the Gemma model using the college admissions dataset"""
-    
-    # Ollama API endpoint for creating/training models
-    api_url = "http://localhost:11434/api/create"
-    
-    # Check if the dataset exists
+    """Fine-tune using Ollama CLI for reliability"""
     dataset_path = "./college_admissions_dataset.jsonl"
     if not os.path.exists(dataset_path):
-        dataset_path = "./jarvis/college_admissions_dataset.jsonl"
-        if not os.path.exists(dataset_path):
-            print(f"Error: Could not find the dataset file at {dataset_path}")
-            return False
-    
-    print(f"Using dataset: {dataset_path}")
-    
-    # Get the absolute path of the dataset file
-    abs_dataset_path = os.path.abspath(dataset_path)
-    print(f"Absolute dataset path: {abs_dataset_path}")
-    
-    # Create a directory for Ollama to access the dataset
-    ollama_data_dir = "./ollama_data"
+        print(f"Error: Missing dataset at {os.path.abspath(dataset_path)}")
+        return False
+        
+    # Validate dataset format
+    try:
+        with open(dataset_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            if not lines:
+                print("Error: Dataset is empty")
+                return False
+            for i, line in enumerate(lines, 1):
+                try:
+                    data = json.loads(line.strip())
+                    if not all(k in data for k in ['prompt', 'response']):
+                        print(f"Error: Line {i} missing required fields")
+                        return False
+                except json.JSONDecodeError:
+                    print(f"Error: Invalid JSON at line {i}")
+                    return False
+    except Exception as e:
+        print(f"Error reading dataset: {str(e)}")
+        return False
+
+    # Prepare training directory
+    ollama_data_dir = os.path.abspath("./ollama_data")
     os.makedirs(ollama_data_dir, exist_ok=True)
     
-    # Copy the dataset to the Ollama data directory
+    # Copy dataset
     dataset_basename = os.path.basename(dataset_path)
-    ollama_dataset_path = os.path.join(ollama_data_dir, dataset_basename)
-    import shutil
-    shutil.copy2(dataset_path, ollama_dataset_path)
-    print(f"Copied dataset to: {ollama_dataset_path}")
+    shutil.copy2(dataset_path, os.path.join(ollama_data_dir, dataset_basename))
     
-    # Create a Modelfile that references the dataset
-    modelfile_content = fFROM gemma:2b
+    # Create Modelfile (Critical fix: proper formatting)
+    modelfile_content = f"""FROM gemma:2b
 
-SYSTEM """
-You are an expert college admissions assistant for Springfield University. 
-Answer questions about admissions, programs, housing, and fees using 
-official information. Be professional but friendly.
-"""
+SYSTEM \"\"\"You are an expert college admissions assistant for SRM University.Answer questions about admissions, programs, housing, and fees using official information.Be professional but friendly.\"\"\"
 
-TRAIN ./college_admissions.jsonl
-
+TRAIN {dataset_basename}
 PARAMETER temperature 0.3
-    
-    # Write the Modelfile to the Ollama data directory
+"""
     modelfile_path = os.path.join(ollama_data_dir, "Modelfile")
     with open(modelfile_path, "w") as f:
         f.write(modelfile_content)
-    print(f"Created Modelfile at: {modelfile_path}")
-    
-    # Prepare the request payload
-    payload = {
-        "name": "college-assistant",  # Name for the fine-tuned model
-        "modelfile": modelfile_content,
-        "stream": False,
-        # The API requires either 'from' or 'files' parameter
-        # We're using the modelfile which already has the FROM directive
-        # Adding path to help Ollama locate the dataset file
-        "path": ollama_data_dir  # Directory containing both Modelfile and dataset
-    }
-    
-    # The error suggests we need to explicitly include the 'from' parameter
-    # Adding it based on the Modelfile content
-    payload["from"] = "gemma:2b"
-    
-    print("Payload prepared. Starting fine-tuning process...")
-    print("This may take a while depending on your hardware and dataset size.")
-    
+
+    # Train using CLI (More reliable than API)
     try:
-        # Send the request to Ollama API
-        response = requests.post(api_url, json=payload)
+        result = subprocess.run(
+            ["ollama", "create", "college-assistant", "-f", modelfile_path],
+            capture_output=True,
+            text=True,
+            timeout=1200  # 20-minute timeout
+        )
         
-        # Check if the request was successful
-        if response.status_code == 200:
-            print("Fine-tuning completed successfully!")
-            print("Your model 'college-assistant' is now available for use.")
-            print("\nYou can use it with: ollama run college-assistant")
+        if result.returncode == 0:
+            print("Model created successfully. Allow 2 minutes for initialization.")
             return True
-        else:
-            print(f"Error: {response.status_code}")
-            print(f"Error details: {response.text}")
-            print("\nTroubleshooting tips:")
-            print("1. Make sure Ollama can access the dataset file.")
-            print("2. Try manually creating the model with: ollama create college-assistant -f ./ollama_data/Modelfile")
-            print("3. Check Ollama logs for more details.")
-            return False
             
+        print(f"Training failed. Ollama output:\n{result.stderr}")
+        return False
+        
     except Exception as e:
-        print(f"An error occurred during fine-tuning: {e}")
-        print("\nTroubleshooting tips:")
-        print("1. Make sure Ollama is running.")
-        print("2. Check your network connection.")
-        print("3. Try manually creating the model with: ollama create college-assistant -f ./ollama_data/Modelfile")
+        print(f"Training error: {str(e)}")
         return False
 
 def validate_training():
-    test_question = "What's the application deadline?"  # From your dataset
-    expected_answer = "January 15th"  # From your dataset
+    print("Starting validation in 60 seconds...")
+    time.sleep(60)  # Critical: Increased wait time
     
-    response = requests.post(
-        "http://localhost:11434/api/generate",
-        json={
-            "model": "college-assistant",
-            "prompt": test_question,
-            "stream": False
+    # Test multiple aspects of the model
+    test_cases = [
+        {
+            "question": "What's the application deadline?",
+            "keywords": ["january", "15", "regular", "admission"]
+        },
+        {
+            "question": "What are the required documents?",
+            "keywords": ["application", "form", "mark", "sheets", "certificate"]
         }
-    )
+    ]
     
-    if expected_answer in response.json()['response']:
-        print("✅ Validation passed!")
-    else:
-        print("❌ Training failed - response doesn't match dataset")
+    failures = 0
+    
+    try:
+        for test_case in test_cases:
+            print(f"\nTesting: {test_case['question']}")
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "college-assistant",
+                    "prompt": test_case['question'],
+                    "stream": False
+                },
+                timeout=30
+            )
+            
+            if not response.ok:
+                print(f"Validation HTTP Error: {response.status_code}")
+                failures += 1
+                continue
+
+            answer = response.json().get("response", "").lower()
+            print(f"Model Response: {answer}")
+            
+            missing_keywords = [k for k in test_case['keywords'] if k not in answer]
+            if missing_keywords:
+                print(f"❌ Failed - Missing keywords: {', '.join(missing_keywords)}")
+                failures += 1
+            else:
+                print("✅ Passed!")
+                
+        if failures == 0:
+            print("\n✅ All validation tests passed!")
+        else:
+            print(f"\n❌ {failures} test(s) failed - Model may need retraining")
+            
+    except Exception as e:
+        print(f"Validation Error: {str(e)}")
 
 def main():
-    print("=== Gemma Model Fine-tuning for College Admissions Assistant ===")
-    print("Make sure Ollama is running before proceeding.")
+    print("=== College Admissions Assistant Training ===")
     
-    # Check if Ollama is running
+    # Verify Ollama running
     try:
-        response = requests.get("http://localhost:11434/api/tags")
-        if response.status_code != 200:
-            print("Error: Could not connect to Ollama. Make sure it's running.")
-            return
+        subprocess.run(["ollama", "serve"], check=True, startupinfo=subprocess.STARTUPINFO())
     except:
-        print("Error: Could not connect to Ollama. Make sure it's running.")
+        print("Error: Start Ollama first with 'ollama serve'")
         return
     
-    print("Ollama is running. Proceeding with fine-tuning...\n")
-    
-    # Start the fine-tuning process
-    success = fine_tune_model()
-    
-    if success:
-        print("\nFine-tuning completed! Running validation...")
+    if fine_tune_model():
         validate_training()
-    else:
-        print("\nFine-tuning process failed. Please check the errors above.")
 
 if __name__ == "__main__":
     main()

@@ -9,7 +9,28 @@ import ollama
 import wikipedia
 import pyjokes
 import re
+import sys
+import os
+from pathlib import Path
 from config.settings import OLLAMA_MODEL, OLLAMA_CUSTOM_MODELS, MAX_HISTORY_LENGTH
+
+# Add the root directory to sys.path to import rag_assistant
+root_dir = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.append(str(root_dir))
+
+# Import the RAG assistant module
+try:
+    # Ensure the rag_assistant module is properly imported
+    from rag_assistant import query_rag_model, setup_vector_db
+    # Initialize the vector database when the service starts
+    RAG_AVAILABLE = setup_vector_db()
+    if RAG_AVAILABLE:
+        print("RAG assistant initialized successfully for college queries.")
+    else:
+        print("Failed to initialize RAG assistant. College queries will use default model.")
+except ImportError:
+    print("RAG assistant module not available. College queries will use default model.")
+    RAG_AVAILABLE = False
 
 class LLMService:
     """
@@ -66,27 +87,37 @@ class LLMService:
             default_keywords = model_info.get('default_for', [])
             if any(keyword in query_lower for keyword in default_keywords):
                 return model_name
-            
-            # Enhanced detection for college-related queries
-            if model_name == 'college-assistant':
-                # Check for common college-related terms and questions
-                college_patterns = [
-                    r'fee(s)?', r'tuition', r'scholarship', r'financial aid',
-                    r'admission', r'enroll(ment)?', r'course(s)?', r'program(s)?',
-                    r'major(s)?', r'degree(s)?', r'campus', r'dorm', r'housing',
-                    r'student(s)?', r'faculty', r'professor(s)?', r'class(es)?',
-                    r'semester', r'quarter', r'academic', r'study', r'college',
-                    r'university', r'school', r'education', r'learn(ing)?',
-                    r'apply(ing)?', r'application', r'deadline', r'requirement(s)?',
-                    r'test(s)?', r'exam(s)?', r'sat', r'act', r'gpa', r'grade(s)?'
-                ]
-                
-                # Check if query matches any college-related pattern
-                if any(re.search(pattern, query_lower) for pattern in college_patterns):
-                    return model_name
         
         # Default to the standard model
         return self.default_model
+    
+    def _is_college_related(self, query):
+        """
+        Determine if a query is related to college or admissions.
+        
+        Args:
+            query (str): The user's query
+            
+        Returns:
+            bool: True if college-related, False otherwise
+        """
+        query_lower = query.lower()
+        
+        # College-related keywords and patterns
+        college_patterns = [
+            r'\bcollege\b', r'\buniversity\b', r'\bcampus\b', r'\bschool\b',
+            r'\badmission\b', r'\badmissions\b', r'\bapply\b', r'\bapplication\b',
+            r'\bfee(s)?\b', r'\btuition\b', r'\bscholarship\b', r'\bfinancial aid\b',
+            r'\benroll(ment)?\b', r'\bcourse(s)?\b', r'\bprogram(s)?\b',
+            r'\bmajor(s)?\b', r'\bdegree(s)?\b', r'\bdorm\b', r'\bhousing\b',
+            r'\bstudent(s)?\b', r'\bfaculty\b', r'\bprofessor(s)?\b', r'\bclass(es)?\b',
+            r'\bsemester\b', r'\bquarter\b', r'\bacademic\b', r'\bstudy\b',
+            r'\bdeadline\b', r'\brequirement(s)?\b',
+            r'\btest(s)?\b', r'\bexam(s)?\b', r'\bsat\b', r'\bact\b', r'\bgpa\b', r'\bgrade(s)?\b'
+        ]
+        
+        # Check if query matches any college-related pattern
+        return any(re.search(pattern, query_lower) for pattern in college_patterns)
     
     def ask(self, query):
         """
@@ -104,6 +135,25 @@ class LLMService:
             if cache_key in self.response_cache:
                 print("Using cached response")
                 return self.response_cache[cache_key]
+            
+            # Check if query is college-related and RAG is available
+            if RAG_AVAILABLE and self._is_college_related(query):
+                print("Using RAG model for college-related query")
+                rag_result = query_rag_model(query)
+                
+                if "error" not in rag_result:
+                    model_response = rag_result["answer"]
+                    
+                    # Add source information if available
+                    if rag_result["sources"] and len(rag_result["sources"]) > 0:
+                        model_response += "\n\nThis information is based on my knowledge of college admissions."
+                    
+                    # Update conversation history and cache
+                    self.conversation_history.append((query, model_response))
+                    self.response_cache[cache_key] = model_response
+                    return model_response
+                else:
+                    print(f"RAG error: {rag_result.get('error')}. Falling back to default model.")
             
             # Format conversation history for context
             context = None

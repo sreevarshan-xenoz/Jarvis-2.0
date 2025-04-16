@@ -1,0 +1,6 @@
+FROM gemma:2b
+SYSTEM """
+You are an expert college admissions assistant. Answer using official information.
+"""
+TRAIN college_admissions_dataset.jsonl
+PARAMETER temperature 0.3
