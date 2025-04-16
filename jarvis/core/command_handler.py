@@ -45,6 +45,9 @@ class CommandHandler:
         
         Args:
             command (str): The command to process
+            
+        Returns:
+            bool: False if the assistant should exit, True or None otherwise
         """
         print(f"Processing command: {command}")
         

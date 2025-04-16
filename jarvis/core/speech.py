@@ -99,6 +99,10 @@ class SpeechEngine:
         Args:
             text (str): The text to be spoken
         """
+        if not text or text.strip() == "":
+            print("Warning: Empty text passed to speak method")
+            return
+            
         # Display text output in console with formatting
         print("\n" + "="*50)
         print(f"🤖 JARVIS: {text}")
@@ -137,7 +141,17 @@ class SpeechEngine:
         
         # Say the text
         self.engine.say(text)
-        self.engine.runAndWait()
+        try:
+            # Block until speech is complete
+            self.engine.runAndWait()
+        except RuntimeError as e:
+            print(f"TTS Engine Runtime Error: {e}")
+            # Recreate the engine if it crashes
+            self.engine = pyttsx3.init()
+            voices = self.engine.getProperty('voices')
+            self.engine.setProperty('voice', voices[0].id)
+        except Exception as e:
+            print(f"TTS Engine Error: {e}")
         
         # Clean up
         self.speaking = False
@@ -147,7 +161,9 @@ class SpeechEngine:
         except Exception as e:
             print(f"Warning: Could not disconnect event handler: {e}")
             # Fallback: Create a new engine instance if needed
-            # self.engine = pyttsx3.init()
+            self.engine = pyttsx3.init()
+            voices = self.engine.getProperty('voices')
+            self.engine.setProperty('voice', voices[0].id)
         
         # If interrupted, return to listening state
         if self.should_interrupt:

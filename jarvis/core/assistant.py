@@ -94,14 +94,22 @@ class JarvisAssistant:
                 if actual_command:
                     # Set animation state to speaking before processing command
                     self.speech_engine.display_window.set_animation_state("speaking")
-                    self.command_handler.process_command(actual_command)
+                    result = self.command_handler.process_command(actual_command)
+                    # Check if the command handler returned a stop signal
+                    if result is False:
+                        self.is_active = False
+                        break
                     # Keep conversation active after command processing
                     self.last_interaction_time = time.time()
                 else:
                     self.speech_engine.speak("Yes? I'm listening...")
                     follow_up_command = self.speech_engine.listen()
                     if follow_up_command:
-                        self.command_handler.process_command(follow_up_command)
+                        result = self.command_handler.process_command(follow_up_command)
+                        # Check if the command handler returned a stop signal
+                        if result is False:
+                            self.is_active = False
+                            break
                         # Keep conversation active after command processing
                         self.last_interaction_time = time.time()
     
