@@ -1,10 +1,70 @@
-{"prompt":"What are the required documents for admission?","response":"For admission, you'll need to submit: completed application form, 10th/12th grade mark sheets, transfer certificate, character certificate, passport photos, and ID proof. International students need passport and visa details."}
-{"prompt":"What's the application deadline?","response":"Regular admission applications must be submitted by January 15th. Late applications accepted until January 30th with late fee."}
-{"prompt":"Can you explain management quota?","response":"35% seats through management quota based on merit and interview. Fees 25% higher than regular admissions. Details on college website."}
-{"prompt":"What's the backlog policy?","response":"Maximum 2 backlogs considered case-by-case. More than 2 requires clearance before application."}
-{"prompt":"What's the fee structure?","response":"Undergraduate: ₹1.5-2.5L/yr, Engineering: ₹2.2L/yr, Medical: ₹3.5L/yr, MBA: ₹2.8L/yr + ₹25k admission fee + ₹15k development charges."}
-{"prompt":"Payment methods available?","response":"Online payments (cards/UPI), demand drafts, NEFT/RTGS. International: wire transfer/credit cards."}
-{"prompt":"Sports quota details?","response":"5% seats reserved. Requires state/national level certificates and trials."}
-{"prompt":"Scholarship options?","response":"Merit-based (50% waiver), need-based, sports, women in STEM scholarships. SC/ST/OBC government schemes supported."}
-{"prompt":"Hostel facilities?","response":"3000+ capacity. Options: single/double/triple (₹75k-1.2L/yr). Wi-Fi, security, dining, laundry, recreation."}
-{"prompt":"Placement statistics?","response":"85% placement rate. 300+ companies. Avg package ₹6.5LPA, highest ₹28LPA. Pre-placement training provided."}
+{
+    "text": "Q: What documents are required for college admission? A: Submit the following: 1) Completed application form 2) 10th/12th grade mark sheets 3) Transfer certificate 4) Character certificate 5) Passport-sized photos 6) Government ID proof. International students must additionally provide passport copy and valid student visa documents.",
+    "metadata": {
+      "keywords": ["admission documents", "required papers", "application checklist", "international requirements"],
+      "category": "Admission Process"
+    }
+  }
+  {
+    "text": "Q: When is the application deadline? A: Main deadline: January 15th. Late applications accepted until January 30th with ₹5,000 late fee. All submissions close at 11:59 PM IST on respective dates.",
+    "metadata": {
+      "keywords": ["last date", "submission timeline", "deadline extension", "late applications"],
+      "category": "Admissions Timeline"
+    }
+  }
+  {
+    "text": "Q: How does the management quota system work? A: 35% seats allocated through management quota. Selection criteria: 1) Academic merit (minimum 75%) 2) Personal interview 3) Extra-curricular achievements. Fees: 25% higher than regular admissions. Complete details available at www.college.edu/admissions.",
+    "metadata": {
+      "keywords": ["special admission", "donation quota", "direct admission", "non-regular seats"],
+      "category": "Admission Types"
+    }
+  }
+  {
+    "text": "Q: What is the policy for students with academic backlogs? A: Maximum 2 backlogs allowed during application review. Candidates with >2 backlogs must submit: 1) Clearance certificate from previous institution 2) Academic improvement plan. Each case reviewed individually by the admissions committee.",
+    "metadata": {
+      "keywords": ["failed subjects", "repeated exams", "academic history", "eligibility criteria"],
+      "category": "Academic Requirements"
+    }
+  }
+  {
+    "text": "Q: What is the detailed fee structure? A: Annual fees (Indian Rupees): 1) Undergraduate: ₹1.5-2.5 lakhs 2) Engineering: ₹2.2 lakhs 3) Medical: ₹3.5 lakhs 4) MBA: ₹2.8 lakhs + Additional charges: ₹25,000 admission fee + ₹15,000 development fee.",
+    "metadata": {
+      "keywords": ["tuition fees", "course costs", "program expenses", "fee breakdown"],
+      "category": "Financial Information"
+    }
+  }
+  {
+    "text": "Q: What payment methods are accepted? A: Available options: 1) Online: Credit/Debit cards, UPI 2) Demand draft payable to 'ABC College' 3) Bank transfer (NEFT/RTGS). International students: SWIFT transfers or credit cards (3% processing fee applies).",
+    "metadata": {
+      "keywords": ["payment options", "online transactions", "bank transfers", "international payments"],
+      "category": "Financial Information"
+    }
+  }
+  {
+    "text": "Q: What are the sports quota provisions? A: 5% seats reserved for athletes. Requirements: 1) State/National level certificates 2) Fitness trials 3) Sports achievement portfolio. Benefits include fee waivers up to 30% for exceptional athletes.",
+    "metadata": {
+      "keywords": ["athletic admissions", "sports scholarships", "trial process", "athlete quotas"],
+      "category": "Admission Types"
+    }
+  }
+  {
+    "text": "Q: What scholarship opportunities exist? A: Available scholarships: 1) Merit-based (50% fee waiver for top 1% rankers) 2) Need-based (family income < ₹5LPA) 3) Women in STEM (30% waiver) 4) Government schemes for SC/ST/OBC students.",
+    "metadata": {
+      "keywords": ["financial aid", "fee discounts", "educational funding", "scholarship programs"],
+      "category": "Financial Aid"
+    }
+  }
+  {
+    "text": "Q: Describe the hostel facilities. A: Campus housing features: 1) 3,000+ capacity 2) Room options: Single (₹1.2L/yr), Double (₹90k/yr), Triple (₹75k/yr) 3) Amenities: Wi-Fi, 24/7 security, cafeteria, laundry, recreation rooms.",
+    "metadata": {
+      "keywords": ["accommodation", "dormitory", "hostel fees", "campus housing"],
+      "category": "Campus Life"
+    }
+  }
+  {
+    "text": "Q: What are recent placement statistics? A: Placement highlights: 1) 85% placement rate (2023 batch) 2) 300+ recruiting companies 3) Average package: ₹6.5 LPA 4) Highest package: ₹28 LPA (Microsoft) 5) Pre-placement training modules available.",
+    "metadata": {
+      "keywords": ["career placements", "job offers", "recruitment stats", "placement preparation"],
+      "category": "Career Services"
+    }
+  }

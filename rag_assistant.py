@@ -32,9 +32,9 @@ def setup_vector_db():
         loader = JSONLoader(
             file_path=data_file, 
             jq_schema='.', 
-            content_key='response',
-            metadata_func=lambda x: {"question": x.get("prompt", "")},
-            text_content=False
+            content_key='text', # Changed from 'response' to 'text'
+            metadata_func=lambda x: {"keywords": x.get("metadata", {}).get("keywords", []), "category": x.get("metadata", {}).get("category", "")}, # Extract metadata
+            text_content=True # Ensure text content is loaded
         )
         docs = loader.load()
         print(f"Loaded {len(docs)} documents")

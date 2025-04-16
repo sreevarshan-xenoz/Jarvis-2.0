@@ -5,7 +5,8 @@ Jarvis Voice Assistant - Media Service Module
 This module handles media playback functionality.
 """
 
-import pywhatkit
+# Removed top-level import: import pywhatkit
+from pywhatkit.core.exceptions import InternetException # Import specific exception
 
 class MediaService:
     """
@@ -26,8 +27,13 @@ class MediaService:
             query (str): The search query for YouTube
         """
         try:
+            import pywhatkit # Import moved inside the function
             pywhatkit.playonyt(query)
+            print(f"Playing '{query}' on YouTube.")
             return True
+        except InternetException:
+            print("Error: Cannot connect to YouTube. Please check your internet connection.")
+            return False
         except Exception as e:
             print(f"Error playing YouTube video: {str(e)}")
             return False
@@ -42,4 +48,5 @@ class MediaService:
         """
         # This could be implemented with a music streaming API or local music player
         # For now, we'll just use YouTube
+        print(f"Attempting to play music: {song_name}")
         return self.play_youtube(song_name + " music")
