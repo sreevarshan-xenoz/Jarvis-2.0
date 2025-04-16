@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FixedSizeList as List } from 'react-window';
-import { useTheme } from 'styled-components';
+// Import FixedSizeList only if you need virtualization
+// import { FixedSizeList as List } from 'react-window';
 
 const ChatContainer = styled(motion.div)`
   width: 100%;
@@ -74,6 +74,47 @@ const Message = styled(motion.div)`
   }
 `;
 
+const Button = styled(motion.button)`
+  padding: 1rem 2rem;
+  border-radius: ${({ theme }) => theme.borderRadius.medium};
+  border: none;
+  background: ${({ theme }) => theme.gradients.primary};
+  color: ${({ theme }) => theme.text};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.animations.fast};
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const Input = styled.input`
+  flex: 1;
+  padding: 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.medium};
+  border: 1px solid ${({ theme }) => theme.border};
+  background: ${({ theme }) => theme.background};
+  color: ${({ theme }) => theme.text};
+  font-size: 1rem;
+  transition: all ${({ theme }) => theme.animations.fast};
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.primary};
+    box-shadow: 0 0 0 2px ${({ theme }) => theme.primary}33;
+  }
+`;
+
 const InputContainer = styled.div`
   padding: 1.5rem;
   background: ${({ theme }) => theme.backgroundSecondary};
@@ -89,7 +130,7 @@ const InputContainer = styled.div`
       flex: 1 1 100%;
     }
     
-    ${Button} {
+    button {
       flex: 1;
     }
   }
@@ -117,42 +158,6 @@ const ErrorMessage = styled.div`
   font-size: 0.9rem;
 `;
 
-const Input = styled.input`
-  flex: 1;
-  padding: 1rem;
-  border-radius: ${({ theme }) => theme.borderRadius.medium};
-  border: 1px solid ${({ theme }) => theme.border};
-  background: ${({ theme }) => theme.background};
-  color: ${({ theme }) => theme.text};
-  font-size: 1rem;
-  transition: all ${({ theme }) => theme.animations.fast};
-
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.primary};
-    box-shadow: 0 0 0 2px ${({ theme }) => theme.primary}33;
-  }
-`;
-
-const Button = styled(motion.button)`
-  padding: 1rem 2rem;
-  border-radius: ${({ theme }) => theme.borderRadius.medium};
-  border: none;
-  background: ${({ theme }) => theme.gradients.primary};
-  color: ${({ theme }) => theme.text};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all ${({ theme }) => theme.animations.fast};
-
-  &:hover {
-    opacity: 0.9;
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-`;
-
 const VoiceIndicator = styled(motion.div)`
   width: 20px;
   height: 20px;
@@ -168,24 +173,21 @@ const ChatInterface = ({ mode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const chatBodyRef = useRef(null);
-  const theme = useTheme();
 
-  const MessageRow = ({ index, style }) => (
-    <Message
-      key={messages[index].id}
-      isUser={messages[index].isUser}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      style={style}
-      tabIndex={0}
-      role="article"
-      aria-label={`${messages[index].isUser ? 'Your message' : 'Assistant\'s response'}: ${messages[index].text}`}
-    >
-      {messages[index].text}
-    </Message>
-  );
+  // Add welcome message on initial load
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([
+        {
+          id: Date.now(),
+          text: "Hello! I'm the SRM College AI Assistant. How can I help you today?",
+          isUser: false,
+        }
+      ]);
+    }
+  }, []);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
@@ -246,38 +248,45 @@ const ChatInterface = ({ mode }) => {
       <ChatBody ref={chatBodyRef}>
         <MessageList>
           <AnimatePresence>
-            <List
-              height={500}
-              itemCount={messages.length}
-              itemSize={80}
-              width="100%"
-              style={{ overflowX: 'hidden' }}
-            >
-              {MessageRow}
-            </List>
-            {isLoading && (
-              <LoadingDots
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                role="status"
-                aria-label="Loading response"
+            {messages.map((message) => (
+              <Message
+                key={message.id}
+                isUser={message.isUser}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                tabIndex={0}
+                role="article"
+                aria-label={`${message.isUser ? 'Your message' : 'Assistant\'s response'}: ${message.text}`}
               >
-                <motion.span
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.8, delay: 0 }}
-                />
-                <motion.span
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.8, delay: 0.2 }}
-                />
-                <motion.span
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.8, delay: 0.4 }}
-                />
-              </LoadingDots>
-            )}
+                {message.text}
+              </Message>
+            ))}
           </AnimatePresence>
+          
+          {isLoading && (
+            <LoadingDots
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              role="status"
+              aria-label="Loading response"
+            >
+              <motion.span
+                animate={{ y: [0, -8, 0] }}
+                transition={{ repeat: Infinity, duration: 0.8, delay: 0 }}
+              />
+              <motion.span
+                animate={{ y: [0, -8, 0] }}
+                transition={{ repeat: Infinity, duration: 0.8, delay: 0.2 }}
+              />
+              <motion.span
+                animate={{ y: [0, -8, 0] }}
+                transition={{ repeat: Infinity, duration: 0.8, delay: 0.4 }}
+              />
+            </LoadingDots>
+          )}
+          
           {error && <ErrorMessage role="alert">{error}</ErrorMessage>}
         </MessageList>
       </ChatBody>
@@ -296,6 +305,7 @@ const ChatInterface = ({ mode }) => {
           <Button
             onClick={handleVoiceToggle}
             whileTap={{ scale: 0.95 }}
+            aria-label={isListening ? "Stop voice input" : "Start voice input"}
           >
             {isListening ? 'Stop' : 'Start'} Voice
           </Button>
@@ -304,7 +314,8 @@ const ChatInterface = ({ mode }) => {
           <Button
             onClick={handleSend}
             whileTap={{ scale: 0.95 }}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
+            aria-label="Send message"
           >
             Send
           </Button>
