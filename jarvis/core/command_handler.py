@@ -195,5 +195,9 @@ class CommandHandler:
         
         # Default: Ask LLM
         else:
-            response = self.llm_service.ask(command)
+            try:
+                response = self.llm_service.ask(command)
+            except Exception as e:
+                print(f"Error in llm_service.ask: {e}")
+                response = f"Sorry, I encountered an error: {e}"
             self.speech_engine.speak(response)
