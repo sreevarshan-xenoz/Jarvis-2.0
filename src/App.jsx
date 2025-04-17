@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import styled, { ThemeProvider } from 'styled-components';
 import Spline from '@splinetool/react-spline';
@@ -22,15 +22,17 @@ const SplineContainer = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 0;
+  z-index: 1;
+  pointer-events: auto;
 `;
 
 const ContentLayer = styled.div`
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  pointer-events: none;
 `;
 
 const HeaderContainer = styled.div`
@@ -38,7 +40,8 @@ const HeaderContainer = styled.div`
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 2;
+  z-index: 3;
+  pointer-events: auto;
 `;
 
 const BottomContainer = styled.div`
@@ -50,7 +53,12 @@ const BottomContainer = styled.div`
   flex-direction: column;
   align-items: center;
   padding-bottom: 2rem;
-  z-index: 2;
+  z-index: 3;
+  pointer-events: none;
+  
+  & > * {
+    pointer-events: auto;
+  }
 `;
 
 const CommandBar = styled(motion.div)`
@@ -101,13 +109,23 @@ const NeonGlow = styled.div`
 
 function App() {
   const [command, setCommand] = useState('');
+  const splineRef = useRef();
+
+  const onLoad = (splineApp) => {
+    splineRef.current = splineApp;
+    console.log('Spline scene loaded');
+  };
 
   return (
     <ThemeProvider theme={darkTheme}>
       <AppContainer>
         <NeonGlow />
         <SplineContainer>
-          <Spline scene="https://prod.spline.design/q2c5wAVesDdTQQ8A/scene.splinecode" />
+          <Spline 
+            scene="https://prod.spline.design/q2c5wAVesDdTQQ8A/scene.splinecode" 
+            onLoad={onLoad}
+            style={{ width: '100%', height: '100%' }}
+          />
         </SplineContainer>
         <ContentLayer>
           <HeaderContainer>
