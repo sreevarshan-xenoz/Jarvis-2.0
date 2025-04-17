@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
+import aiService from '../services/aiService';
 // Import FixedSizeList only if you need virtualization
 // import { FixedSizeList as List } from 'react-window';
 
@@ -208,6 +209,32 @@ const VoiceIndicator = styled(motion.div)`
   box-shadow: 0 0 10px rgba(66, 220, 219, 0.5);
 `;
 
+const AudioButton = styled(motion.button)`
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(66, 220, 219, 0.3), rgba(165, 55, 253, 0.3));
+  border: 1px solid rgba(128, 0, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.8rem;
+  padding: 0;
+  
+  &:hover {
+    background: linear-gradient(135deg, rgba(66, 220, 219, 0.5), rgba(165, 55, 253, 0.5));
+  }
+  
+  &:focus {
+    outline: none;
+  }
+`;
+
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -233,6 +260,33 @@ const ChatInterface = () => {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const playMessageAudio = async (message) => {
+    try {
+      // We'll assume messages have an audioUrl property that may be null
+      if (!message.audioUrl) {
+        // Convert text to audio through Supabase function
+        const result = await aiService.textToSpeech(message.text);
+        // Update the message with the audio URL
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === message.id ? { ...msg, audioUrl: result.audioUrl } : msg
+          )
+        );
+        
+        // Play the audio
+        const audio = new Audio(result.audioUrl);
+        audio.play();
+      } else {
+        // Play existing audio
+        const audio = new Audio(message.audioUrl);
+        audio.play();
+      }
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      setError('Failed to play audio');
+    }
+  };
 
   return (
     <ChatContainer
@@ -265,6 +319,16 @@ const ChatInterface = () => {
                 aria-label={`${message.isUser ? 'Your message' : 'AURA\'s response'}: ${message.text}`}
               >
                 {message.text}
+                {!message.isUser && (
+                  <AudioButton 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => playMessageAudio(message)}
+                    aria-label="Play message audio"
+                  >
+                    🔊
+                  </AudioButton>
+                )}
               </Message>
             ))}
           </AnimatePresence>
