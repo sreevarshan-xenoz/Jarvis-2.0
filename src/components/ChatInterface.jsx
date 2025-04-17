@@ -235,11 +235,24 @@ const AudioButton = styled(motion.button)`
   }
 `;
 
+const AudioStatusIndicator = styled(motion.span)`
+  position: absolute;
+  bottom: 0.5rem;
+  right: 2.5rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+`;
+
+// Mock audio URL for testing - you'll replace this with your actual audio service
+const DEMO_AUDIO_URL = 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg';
+
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
   const chatBodyRef = useRef(null);
+  const audioRef = useRef(new Audio());
 
   // Add welcome message on initial load
   useEffect(() => {
@@ -261,30 +274,79 @@ const ChatInterface = () => {
     }
   }, [messages]);
 
+  // Handle audio playback cleanup
+  useEffect(() => {
+    const audio = audioRef.current;
+    
+    // Set up audio events
+    const handleEnded = () => setPlayingAudioId(null);
+    const handleError = (e) => {
+      console.error('Audio playback error:', e);
+      setPlayingAudioId(null);
+      setError('Failed to play audio');
+    };
+    
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+    
+    return () => {
+      audio.pause();
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
+    };
+  }, []);
+
   const playMessageAudio = async (message) => {
     try {
-      // We'll assume messages have an audioUrl property that may be null
+      // If already playing this message's audio, stop it
+      if (playingAudioId === message.id) {
+        audioRef.current.pause();
+        setPlayingAudioId(null);
+        return;
+      }
+      
+      // Stop any currently playing audio
+      audioRef.current.pause();
+      
+      let audioUrl;
+      
+      // If no audio URL exists for this message yet, generate one
       if (!message.audioUrl) {
-        // Convert text to audio through Supabase function
+        setPlayingAudioId('loading');
+        
+        // Convert text to audio through AI service
         const result = await aiService.textToSpeech(message.text);
+        
         // Update the message with the audio URL
+        audioUrl = result.audioUrl;
         setMessages(prevMessages => 
           prevMessages.map(msg => 
-            msg.id === message.id ? { ...msg, audioUrl: result.audioUrl } : msg
+            msg.id === message.id ? { ...msg, audioUrl: audioUrl } : msg
           )
         );
-        
-        // Play the audio
-        const audio = new Audio(result.audioUrl);
-        audio.play();
       } else {
-        // Play existing audio
-        const audio = new Audio(message.audioUrl);
-        audio.play();
+        audioUrl = message.audioUrl;
+      }
+      
+      // Play the audio
+      audioRef.current.src = audioUrl;
+      
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setPlayingAudioId(message.id);
+          })
+          .catch(error => {
+            console.error('Audio play error:', error);
+            setError('Browser blocked audio playback. Please interact with the page first.');
+            setPlayingAudioId(null);
+          });
       }
     } catch (error) {
       console.error('Error playing audio:', error);
-      setError('Failed to play audio');
+      setError('Failed to play audio: ' + error.message);
+      setPlayingAudioId(null);
     }
   };
 
@@ -320,14 +382,36 @@ const ChatInterface = () => {
               >
                 {message.text}
                 {!message.isUser && (
-                  <AudioButton 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => playMessageAudio(message)}
-                    aria-label="Play message audio"
-                  >
-                    🔊
-                  </AudioButton>
+                  <>
+                    <AudioButton 
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => playMessageAudio(message)}
+                      aria-label={playingAudioId === message.id ? "Pause audio" : "Play message audio"}
+                    >
+                      {playingAudioId === message.id ? '⏸' : '🔊'}
+                    </AudioButton>
+                    
+                    {playingAudioId === message.id && (
+                      <AudioStatusIndicator 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        Playing...
+                      </AudioStatusIndicator>
+                    )}
+                    
+                    {playingAudioId === 'loading' && message.id === messages[messages.length - 1].id && (
+                      <AudioStatusIndicator 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        Loading audio...
+                      </AudioStatusIndicator>
+                    )}
+                  </>
                 )}
               </Message>
             ))}
