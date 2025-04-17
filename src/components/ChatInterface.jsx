@@ -162,14 +162,11 @@ const VoiceIndicator = styled(motion.div)`
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: ${({ isActive, theme }) =>
-    isActive ? theme.success : theme.textSecondary};
+  background: ${({ theme }) => theme.success};
 `;
 
-const ChatInterface = ({ mode }) => {
+const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const chatBodyRef = useRef(null);
@@ -194,42 +191,6 @@ const ChatInterface = ({ mode }) => {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const newMessage = {
-        id: Date.now(),
-        text: input,
-        isUser: true,
-      };
-
-      setMessages((prev) => [...prev, newMessage]);
-      setInput('');
-
-      // Simulate AI response with error handling
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const aiResponse = {
-        id: Date.now(),
-        text: 'This is a simulated AI response. Integration with the actual backend will be implemented soon.',
-        isUser: false,
-      };
-      setMessages((prev) => [...prev, aiResponse]);
-    } catch (err) {
-      setError('Failed to send message. Please try again.');
-      console.error('Error sending message:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVoiceToggle = () => {
-    setIsListening(!isListening);
-    // Voice recognition logic will be implemented here
-  };
-
   return (
     <ChatContainer
       initial={{ opacity: 0, y: 20 }}
@@ -237,11 +198,7 @@ const ChatInterface = ({ mode }) => {
       transition={{ duration: 0.5 }}
     >
       <ChatHeader>
-        <VoiceIndicator
-          isActive={isListening}
-          animate={{ scale: isListening ? [1, 1.2, 1] : 1 }}
-          transition={{ repeat: isListening ? Infinity : 0, duration: 1 }}
-        />
+        <VoiceIndicator />
         <h2>SRM College AI Assistant</h2>
       </ChatHeader>
 
@@ -290,37 +247,6 @@ const ChatInterface = ({ mode }) => {
           {error && <ErrorMessage role="alert">{error}</ErrorMessage>}
         </MessageList>
       </ChatBody>
-
-      <InputContainer>
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Type your message..."
-          disabled={mode === 'voice' || isLoading}
-          aria-label="Message input"
-          role="textbox"
-        />
-        {mode !== 'text' && (
-          <Button
-            onClick={handleVoiceToggle}
-            whileTap={{ scale: 0.95 }}
-            aria-label={isListening ? "Stop voice input" : "Start voice input"}
-          >
-            {isListening ? 'Stop' : 'Start'} Voice
-          </Button>
-        )}
-        {mode !== 'voice' && (
-          <Button
-            onClick={handleSend}
-            whileTap={{ scale: 0.95 }}
-            disabled={!input.trim() || isLoading}
-            aria-label="Send message"
-          >
-            Send
-          </Button>
-        )}
-      </InputContainer>
     </ChatContainer>
   );
 };
