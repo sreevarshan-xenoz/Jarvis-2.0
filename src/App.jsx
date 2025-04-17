@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import styled, { ThemeProvider } from 'styled-components';
 import Spline from '@splinetool/react-spline';
 import { darkTheme } from './themes/darkTheme';
 import ChatInterface from './components/ChatInterface';
 import Header from './components/Header';
+import DiagnosticPanel from './components/DiagnosticPanel';
 import aiService from './services/aiService';
 
 const AppContainer = styled.div`
@@ -172,10 +173,43 @@ const NotificationContainer = styled(motion.div)`
   z-index: 5;
 `;
 
+const DiagnosticButton = styled(motion.button)`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: linear-gradient(135deg, rgba(66, 220, 219, 0.2), rgba(165, 55, 253, 0.2));
+  border: 1px solid rgba(66, 220, 219, 0.3);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  &:hover {
+    background: linear-gradient(135deg, rgba(66, 220, 219, 0.3), rgba(165, 55, 253, 0.3));
+  }
+`;
+
+const DiagnosticIcon = styled.span`
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: ${({ isOnline }) => 
+    isOnline ? 'rgba(66, 220, 219, 0.8)' : 'rgba(255, 87, 87, 0.8)'};
+  box-shadow: 0 0 5px ${({ isOnline }) => 
+    isOnline ? 'rgba(66, 220, 219, 0.6)' : 'rgba(255, 87, 87, 0.6)'};
+`;
+
 function App() {
   const [command, setCommand] = useState('');
   const [modelStatus, setModelStatus] = useState({ online: false, status: 'Checking model status...' });
   const [notification, setNotification] = useState(null);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
   const backgroundSplineRef = useRef();
   const foregroundSplineRef = useRef();
 
@@ -264,6 +298,21 @@ function App() {
             style={{ width: '100%', height: '100%' }}
           />
         </SplineForegroundContainer>
+        
+        <DiagnosticButton
+          onClick={() => setShowDiagnostic(true)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <DiagnosticIcon isOnline={modelStatus.online} />
+          Run Diagnostic
+        </DiagnosticButton>
+        
+        <AnimatePresence>
+          {showDiagnostic && (
+            <DiagnosticPanel onClose={() => setShowDiagnostic(false)} />
+          )}
+        </AnimatePresence>
         
         <ContentLayer>
           <HeaderContainer>
