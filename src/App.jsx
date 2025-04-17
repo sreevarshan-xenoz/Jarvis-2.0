@@ -17,7 +17,8 @@ const AppContainer = styled.div`
   overflow: hidden;
 `;
 
-const SplineContainer = styled.div`
+// First scene - now the waves scene as background (previously overlay)
+const SplineBackgroundContainer = styled.div`
   position: absolute;
   top: 0;
   left: 0;
@@ -27,9 +28,21 @@ const SplineContainer = styled.div`
   pointer-events: auto;
 `;
 
+// Second scene - now the qX39 scene as overlay with opacity (previously background)
+const SplineForegroundContainer = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: auto;
+  opacity: 0.5;
+`;
+
 const ContentLayer = styled.div`
   position: relative;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -41,7 +54,7 @@ const HeaderContainer = styled.div`
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 3;
+  z-index: 4;
   pointer-events: auto;
 `;
 
@@ -54,7 +67,7 @@ const BottomContainer = styled.div`
   flex-direction: column;
   align-items: center;
   padding-bottom: 2rem;
-  z-index: 3;
+  z-index: 4;
   pointer-events: none;
   
   & > * {
@@ -119,7 +132,7 @@ const StatusIndicator = styled.div`
     isOnline ? 'rgba(66, 220, 219, 1)' : 'rgba(255, 87, 87, 1)'};
   box-shadow: 0 0 10px ${({ isOnline }) => 
     isOnline ? 'rgba(66, 220, 219, 0.7)' : 'rgba(255, 87, 87, 0.7)'};
-  z-index: 4;
+  z-index: 5;
 `;
 
 const StatusTooltip = styled.div`
@@ -134,7 +147,7 @@ const StatusTooltip = styled.div`
   transform: translateY(10px);
   transition: all 0.3s ease;
   pointer-events: none;
-  z-index: 4;
+  z-index: 5;
 
   ${StatusIndicator}:hover + & {
     opacity: 1;
@@ -163,7 +176,8 @@ function App() {
   const [command, setCommand] = useState('');
   const [modelStatus, setModelStatus] = useState({ online: false, status: 'Checking model status...' });
   const [notification, setNotification] = useState(null);
-  const splineRef = useRef();
+  const backgroundSplineRef = useRef();
+  const foregroundSplineRef = useRef();
 
   useEffect(() => {
     // Check model status on initial load
@@ -190,9 +204,14 @@ function App() {
     }
   };
 
-  const onLoad = (splineApp) => {
-    splineRef.current = splineApp;
-    console.log('Spline scene loaded');
+  const onLoadBackground = (splineApp) => {
+    backgroundSplineRef.current = splineApp;
+    console.log('Background Spline scene loaded');
+  };
+
+  const onLoadForeground = (splineApp) => {
+    foregroundSplineRef.current = splineApp;
+    console.log('Foreground Spline scene loaded');
   };
 
   const handleCommandSubmit = async (e) => {
@@ -227,13 +246,25 @@ function App() {
     <ThemeProvider theme={darkTheme}>
       <AppContainer>
         <NeonGlow />
-        <SplineContainer>
+        
+        {/* The newer 3D scene forms the solid background */}
+        <SplineBackgroundContainer>
           <Spline 
-            scene="https://prod.spline.design/q2c5wAVesDdTQQ8A/scene.splinecode" 
-            onLoad={onLoad}
+            scene="https://prod.spline.design/qX39OiHwKkpiLOPh/scene.splinecode" 
+            onLoad={onLoadBackground}
             style={{ width: '100%', height: '100%' }}
           />
-        </SplineContainer>
+        </SplineBackgroundContainer>
+        
+        {/* The wave design overlays with partial transparency */}
+        <SplineForegroundContainer>
+          <Spline 
+            scene="https://prod.spline.design/q2c5wAVesDdTQQ8A/scene.splinecode" 
+            onLoad={onLoadForeground}
+            style={{ width: '100%', height: '100%' }}
+          />
+        </SplineForegroundContainer>
+        
         <ContentLayer>
           <HeaderContainer>
             <Header />
