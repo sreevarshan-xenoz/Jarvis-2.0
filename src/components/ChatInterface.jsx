@@ -26,8 +26,15 @@ const ChatHeader = styled.div`
   color: ${({ theme }) => theme.text};
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
   border-bottom: 1px solid rgba(128, 0, 255, 0.4);
+`;
+
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 `;
 
 const HeaderTitle = styled.h2`
@@ -243,14 +250,97 @@ const AudioStatusIndicator = styled(motion.span)`
   color: rgba(255, 255, 255, 0.7);
 `;
 
+const VoiceModeToggle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: ${({ active }) => 
+    active ? 'rgba(66, 220, 219, 0.9)' : 'rgba(255, 255, 255, 0.6)'};
+`;
+
+const VoiceModeIcon = styled.div`
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: ${({ active }) => 
+    active ? 'rgba(66, 220, 219, 0.2)' : 'rgba(255, 255, 255, 0.1)'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid ${({ active }) => 
+    active ? 'rgba(66, 220, 219, 0.6)' : 'rgba(255, 255, 255, 0.3)'};
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: ${({ active }) => 
+      active ? 'rgba(66, 220, 219, 0.3)' : 'rgba(255, 255, 255, 0.2)'};
+  }
+`;
+
 // Mock audio URL for testing - you'll replace this with your actual audio service
 const DEMO_AUDIO_URL = 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg';
+
+const InputForm = styled.form`
+  display: flex;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-top: 1px solid rgba(128, 0, 255, 0.4);
+`;
+
+const MessageInput = styled.input`
+  flex: 1;
+  background: rgba(20, 20, 30, 0.7);
+  border: 1px solid rgba(128, 0, 255, 0.3);
+  border-radius: 20px;
+  color: white;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  
+  &:focus {
+    outline: none;
+    border-color: rgba(66, 220, 219, 0.6);
+    box-shadow: 0 0 10px rgba(66, 220, 219, 0.2);
+  }
+  
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+  }
+`;
+
+const SendButton = styled(motion.button)`
+  background: linear-gradient(135deg, rgba(66, 220, 219, 0.5), rgba(165, 55, 253, 0.5));
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.5rem;
+  cursor: pointer;
+  color: white;
+  font-size: 1rem;
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 10px rgba(66, 220, 219, 0.4);
+  }
+`;
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [playingAudioId, setPlayingAudioId] = useState(null);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [inputMessage, setInputMessage] = useState('');
   const chatBodyRef = useRef(null);
   const audioRef = useRef(new Audio());
 
@@ -272,7 +362,15 @@ const ChatInterface = () => {
     if (chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
     }
-  }, [messages]);
+
+    // Auto-play the latest assistant message if voice mode is enabled
+    if (voiceMode && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (!lastMessage.isUser && lastMessage.id !== playingAudioId) {
+        playMessageAudio(lastMessage);
+      }
+    }
+  }, [messages, voiceMode]);
 
   // Handle audio playback cleanup
   useEffect(() => {
@@ -350,6 +448,66 @@ const ChatInterface = () => {
     }
   };
 
+  const toggleVoiceMode = () => {
+    const newMode = !voiceMode;
+    setVoiceMode(newMode);
+    
+    // Stop any playing audio when turning off voice mode
+    if (!newMode && playingAudioId) {
+      audioRef.current.pause();
+      setPlayingAudioId(null);
+    }
+    
+    // Start playing latest assistant message when turning on voice mode
+    if (newMode && messages.length > 0) {
+      const lastAssistantMessage = [...messages].reverse().find(msg => !msg.isUser);
+      if (lastAssistantMessage) {
+        playMessageAudio(lastAssistantMessage);
+      }
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    
+    if (!inputMessage.trim()) return;
+    
+    const userMessage = {
+      id: Date.now(),
+      text: inputMessage.trim(),
+      isUser: true
+    };
+    
+    // Clear input field
+    setInputMessage('');
+    
+    // Add user message to chat
+    setMessages(prev => [...prev, userMessage]);
+    
+    // Show loading state
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Send message to AI service
+      const response = await aiService.sendMessage(userMessage.text);
+      
+      // Add AI response to chat
+      const aiMessage = {
+        id: Date.now(),
+        text: response.response || "I couldn't generate a response at this time.",
+        isUser: false
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setError(`Failed to get response: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <ChatContainer
       initial={{ opacity: 0, y: 20 }}
@@ -357,13 +515,28 @@ const ChatInterface = () => {
       transition={{ duration: 0.5 }}
     >
       <ChatHeader>
-        <VoiceIndicator 
-          animate={{ 
-            boxShadow: ['0 0 10px rgba(66, 220, 219, 0.5)', '0 0 20px rgba(165, 55, 253, 0.5)', '0 0 10px rgba(66, 220, 219, 0.5)']
-          }}
-          transition={{ repeat: Infinity, duration: 2 }}
-        />
-        <HeaderTitle>AURA</HeaderTitle>
+        <HeaderLeft>
+          <VoiceIndicator 
+            animate={{ 
+              boxShadow: ['0 0 10px rgba(66, 220, 219, 0.5)', '0 0 20px rgba(165, 55, 253, 0.5)', '0 0 10px rgba(66, 220, 219, 0.5)']
+            }}
+            transition={{ repeat: Infinity, duration: 2 }}
+          />
+          <HeaderTitle>AURA</HeaderTitle>
+        </HeaderLeft>
+
+        <VoiceModeToggle
+          active={voiceMode}
+          onClick={toggleVoiceMode}
+          role="button"
+          aria-pressed={voiceMode}
+          aria-label="Toggle voice mode"
+        >
+          <VoiceModeIcon active={voiceMode}>
+            {voiceMode ? '🔊' : '🔇'}
+          </VoiceModeIcon>
+          <span>Voice {voiceMode ? 'On' : 'Off'}</span>
+        </VoiceModeToggle>
       </ChatHeader>
 
       <ChatBody ref={chatBodyRef}>
@@ -443,6 +616,25 @@ const ChatInterface = () => {
           {error && <ErrorMessage role="alert">{error}</ErrorMessage>}
         </MessageList>
       </ChatBody>
+
+      <InputForm onSubmit={handleSendMessage}>
+        <MessageInput
+          type="text"
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)}
+          placeholder="Type a message..."
+          disabled={isLoading}
+        />
+        <SendButton
+          type="submit"
+          disabled={isLoading || !inputMessage.trim()}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          aria-label="Send message"
+        >
+          →
+        </SendButton>
+      </InputForm>
     </ChatContainer>
   );
 };

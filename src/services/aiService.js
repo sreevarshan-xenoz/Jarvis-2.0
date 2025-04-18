@@ -5,6 +5,11 @@ const FALLBACK_AUDIO_URL = 'https://actions.google.com/sounds/v1/alarms/beep_sho
 
 /**
  * AI Service - Handles communication with the API server for AI operations
+ * 
+ * Updated to support the unified input approach:
+ * - Regular messages are sent via sendMessage() for conversation
+ * - Commands (prefixed with /) are sent via executeCommand()
+ * - Both types of interactions appear in the chat history
  */
 
 // Base URL for API calls

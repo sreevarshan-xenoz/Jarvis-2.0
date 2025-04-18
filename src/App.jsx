@@ -232,7 +232,7 @@ const darkTheme = {
   info: '#42A5F5'
 };
 
-function App() {
+const App = () => {
   const [messages, setMessages] = useState(() => {
     // Load messages from localStorage if available
     const savedMessages = localStorage.getItem('aura_messages');
@@ -247,8 +247,12 @@ function App() {
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [notification, setNotification] = useState(null);
   const [useJarvis, setUseJarvis] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const backgroundSplineRef = useRef();
   const foregroundSplineRef = useRef();
+  const audioRef = useRef(new Audio());
+  const [playingAudioId, setPlayingAudioId] = useState(null);
 
   useEffect(() => {
     // Check model status on initial load
@@ -264,6 +268,27 @@ function App() {
     // Save messages to localStorage whenever they change
     localStorage.setItem('aura_messages', JSON.stringify(messages));
   }, [messages]);
+
+  // Handle audio playback cleanup
+  useEffect(() => {
+    const audio = audioRef.current;
+    
+    // Set up audio events
+    const handleEnded = () => setPlayingAudioId(null);
+    const handleError = (e) => {
+      console.error('Audio playback error:', e);
+      setPlayingAudioId(null);
+    };
+    
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+    
+    return () => {
+      audio.pause();
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
+    };
+  }, []);
 
   const checkModelStatus = async () => {
     try {
@@ -290,25 +315,133 @@ function App() {
     console.log('Foreground Spline scene loaded');
   };
 
-  const handleCommandSubmit = async (e) => {
+  const handleUnifiedInput = async (e) => {
     e.preventDefault();
     if (!command.trim()) return;
 
-    const userCommand = command.trim();
+    const userInput = command.trim();
     setCommand('');
+    setIsLoading(true);
+
+    // Add user message to chat history
+    const userMessage = {
+      id: Date.now(),
+      role: 'user',
+      content: userInput
+    };
+    setMessages(prevMessages => [...prevMessages, userMessage]);
 
     try {
-      showNotification('Executing command...');
-      
-      const result = await aiService.executeCommand(userCommand, useJarvis);
-      
-      if (result.success) {
-        showNotification(result.message || 'Command executed successfully');
+      // Check if input starts with a command prefix like "/"
+      if (userInput.startsWith('/')) {
+        // Handle as command
+        const cmdText = userInput.substring(1); // Remove the slash
+        showNotification('Executing command...');
+        
+        const result = await aiService.executeCommand(cmdText, useJarvis);
+        
+        // Add command result to chat
+        const responseMessage = {
+          id: Date.now(),
+          role: 'assistant',
+          content: result.message || 'Command executed'
+        };
+        setMessages(prevMessages => [...prevMessages, responseMessage]);
+        
+        if (result.success) {
+          showNotification(result.message || 'Command executed successfully');
+        } else {
+          showNotification(result.message || 'Command execution failed');
+        }
+
+        // Auto-play response if voice mode is on
+        if (voiceMode) {
+          playMessageAudio(responseMessage);
+        }
       } else {
-        showNotification(result.message || 'Command execution failed');
+        // Handle as conversation
+        const response = await aiService.sendMessage(userInput);
+        
+        // Add AI response to chat
+        const responseMessage = {
+          id: Date.now(),
+          role: 'assistant',
+          content: response.response || "I couldn't generate a response at this time."
+        };
+        setMessages(prevMessages => [...prevMessages, responseMessage]);
+        
+        // Auto-play response if voice mode is on
+        if (voiceMode) {
+          playMessageAudio(responseMessage);
+        }
       }
     } catch (error) {
-      showNotification(`Error: ${error.message || 'Failed to execute command'}`);
+      console.error('Error processing input:', error);
+      showNotification(`Error: ${error.message || 'Failed to process input'}`);
+      
+      // Add error message to chat
+      const errorMessage = {
+        id: Date.now(),
+        role: 'assistant',
+        content: `Error: ${error.message || 'Something went wrong'}`
+      };
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const playMessageAudio = async (message) => {
+    try {
+      // If already playing this message's audio, stop it
+      if (playingAudioId === message.id) {
+        audioRef.current.pause();
+        setPlayingAudioId(null);
+        return;
+      }
+      
+      // Stop any currently playing audio
+      audioRef.current.pause();
+      
+      let audioUrl;
+      
+      // If no audio URL exists for this message yet, generate one
+      if (!message.audioUrl) {
+        setPlayingAudioId('loading');
+        
+        // Convert text to audio through AI service
+        const result = await aiService.textToSpeech(message.content);
+        
+        // Update the message with the audio URL
+        audioUrl = result.audioUrl;
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === message.id ? { ...msg, audioUrl: audioUrl } : msg
+          )
+        );
+      } else {
+        audioUrl = message.audioUrl;
+      }
+      
+      // Play the audio
+      audioRef.current.src = audioUrl;
+      
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setPlayingAudioId(message.id);
+          })
+          .catch(error => {
+            console.error('Audio play error:', error);
+            showNotification('Browser blocked audio playback. Please interact with the page first.');
+            setPlayingAudioId(null);
+          });
+      }
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      showNotification('Failed to play audio: ' + error.message);
+      setPlayingAudioId(null);
     }
   };
 
@@ -333,6 +466,20 @@ function App() {
   const handleUseJarvisChange = (value) => {
     setUseJarvis(value);
     showNotification(value ? 'Switched to Jarvis' : 'Switched to AURA AI');
+  };
+
+  // Toggle voice mode
+  const toggleVoiceMode = () => {
+    const newMode = !voiceMode;
+    setVoiceMode(newMode);
+    
+    // Stop any playing audio when turning off voice mode
+    if (!newMode && playingAudioId) {
+      audioRef.current.pause();
+      setPlayingAudioId(null);
+    }
+    
+    showNotification(newMode ? 'Voice mode enabled' : 'Voice mode disabled');
   };
 
   return (
@@ -366,6 +513,28 @@ function App() {
           whileTap={{ scale: 0.95 }}
         >
           Clear History
+        </motion.button>
+        
+        <motion.button
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '120px',
+            background: 'rgba(30, 30, 50, 0.7)',
+            border: `1px solid ${voiceMode ? 'rgba(66, 220, 219, 0.6)' : 'rgba(255, 255, 255, 0.4)'}`,
+            borderRadius: '20px',
+            color: voiceMode ? 'rgba(66, 220, 219, 0.9)' : 'rgba(255, 255, 255, 0.8)',
+            fontSize: '12px',
+            padding: '6px 12px',
+            cursor: 'pointer',
+            zIndex: 10,
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={toggleVoiceMode}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          Voice {voiceMode ? 'On' : 'Off'}
         </motion.button>
         
         <DiagnosticButton
@@ -409,23 +578,87 @@ function App() {
           </HeaderContainer>
           
           <BottomContainer>
-            <ChatInterface />
+            {/* Chat Display Section */}
+            <ChatDisplayContainer>
+              <ChatHeader>
+                <HeaderLeft>
+                  <VoiceIndicator 
+                    animate={{ 
+                      boxShadow: ['0 0 10px rgba(66, 220, 219, 0.5)', '0 0 20px rgba(165, 55, 253, 0.5)', '0 0 10px rgba(66, 220, 219, 0.5)']
+                    }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                  />
+                  <HeaderTitle>AURA</HeaderTitle>
+                </HeaderLeft>
+                <div>
+                  {playingAudioId && playingAudioId !== 'loading' && (
+                    <span style={{ fontSize: '0.8rem', color: 'rgba(66, 220, 219, 0.9)' }}>
+                      Playing audio...
+                    </span>
+                  )}
+                </div>
+              </ChatHeader>
+              
+              <ChatBody>
+                <AnimatePresence>
+                  {messages.map((message) => (
+                    <ChatMessage 
+                      key={message.id}
+                      isUser={message.role === 'user'}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      {message.content}
+                      {message.role === 'assistant' && (
+                        <AudioButton 
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => playMessageAudio(message)}
+                        >
+                          {playingAudioId === message.id ? '⏸' : '🔊'}
+                        </AudioButton>
+                      )}
+                    </ChatMessage>
+                  ))}
+                </AnimatePresence>
+                
+                {isLoading && (
+                  <LoadingContainer>
+                    <LoadingDots>
+                      <motion.span animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} />
+                      <motion.span animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} />
+                      <motion.span animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} />
+                    </LoadingDots>
+                  </LoadingContainer>
+                )}
+              </ChatBody>
+            </ChatDisplayContainer>
             
             <CommandBar
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
+              as="form"
+              onSubmit={handleUnifiedInput}
             >
               <CommandInput 
-                placeholder="Enter command..."
+                placeholder="Enter message or /command..."
                 value={command}
                 onChange={(e) => setCommand(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCommandSubmit(e);
-                  }
-                }}
+                disabled={isLoading}
               />
+              <SendButton 
+                type="submit"
+                disabled={isLoading || !command.trim()}
+                whileHover={{ scale: isLoading ? 1 : 1.05 }}
+                whileTap={{ scale: isLoading ? 1 : 0.95 }}
+              >
+                {isLoading ? (
+                  <LoadingIcon />
+                ) : (
+                  <SendIcon />
+                )}
+              </SendButton>
             </CommandBar>
 
             {notification && (
@@ -445,6 +678,174 @@ function App() {
       </AppContainer>
     </ThemeProvider>
   );
-}
+};
+
+// Add these styled components
+const ChatDisplayContainer = styled.div`
+  width: 90%;
+  max-width: 600px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 15px;
+  box-shadow: 0 0 15px rgba(66, 220, 219, 0.5), 0 0 30px rgba(120, 0, 255, 0.3);
+  overflow: hidden;
+  border: 1px solid rgba(128, 0, 255, 0.4);
+  margin-bottom: 20px;
+`;
+
+const ChatHeader = styled.div`
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(30, 0, 60, 0.9) 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(128, 0, 255, 0.4);
+`;
+
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const HeaderTitle = styled.h2`
+  font-size: 1.2rem;
+  background: linear-gradient(90deg, #42dcdb, #a537fd);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 10px rgba(66, 220, 219, 0.5);
+  font-weight: 700;
+  margin: 0;
+`;
+
+const VoiceIndicator = styled(motion.div)`
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #42dcdb, #a537fd);
+  box-shadow: 0 0 10px rgba(66, 220, 219, 0.5);
+`;
+
+const ChatBody = styled.div`
+  height: 250px;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #42dcdb, #a537fd);
+    border-radius: 10px;
+  }
+`;
+
+const ChatMessage = styled(motion.div)`
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: ${({ isUser }) => 
+    isUser 
+      ? 'linear-gradient(135deg, rgba(66, 220, 219, 0.2) 0%, rgba(66, 220, 219, 0.1) 100%)' 
+      : 'linear-gradient(135deg, rgba(165, 55, 253, 0.2) 0%, rgba(165, 55, 253, 0.1) 100%)'};
+  color: white;
+  max-width: 85%;
+  align-self: ${({ isUser }) => (isUser ? 'flex-end' : 'flex-start')};
+  box-shadow: ${({ isUser }) => 
+    isUser 
+      ? '0 0 10px rgba(66, 220, 219, 0.2)' 
+      : '0 0 10px rgba(165, 55, 253, 0.2)'};
+  position: relative;
+  word-break: break-word;
+  border: 1px solid ${({ isUser }) => 
+    isUser 
+      ? 'rgba(66, 220, 219, 0.3)' 
+      : 'rgba(165, 55, 253, 0.3)'};
+  font-size: 0.9rem;
+  
+  &:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+  }
+`;
+
+const AudioButton = styled(motion.button)`
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(66, 220, 219, 0.3), rgba(165, 55, 253, 0.3));
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.7rem;
+  padding: 0;
+  
+  &:hover {
+    background: linear-gradient(135deg, rgba(66, 220, 219, 0.5), rgba(165, 55, 253, 0.5));
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem;
+`;
+
+const LoadingDots = styled.div`
+  display: flex;
+  gap: 4px;
+  
+  span {
+    width: 8px;
+    height: 8px;
+    background: linear-gradient(90deg, #42dcdb, #a537fd);
+    border-radius: 50%;
+  }
+`;
+
+const SendButton = styled(motion.button)`
+  background: linear-gradient(135deg, rgba(66, 220, 219, 0.7), rgba(165, 55, 253, 0.7));
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+  color: white;
+  cursor: pointer;
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const LoadingIcon = () => (
+  <motion.div
+    animate={{ rotate: 360 }}
+    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+    style={{ width: '16px', height: '16px', borderRadius: '50%', 
+            border: '2px solid rgba(255,255,255,0.2)', 
+            borderTopColor: 'white' }}
+  />
+);
+
+const SendIcon = () => <span>➤</span>;
 
 export default App;

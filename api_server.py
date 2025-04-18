@@ -3,34 +3,98 @@ FastAPI server for AURA - Augmented User Response Assistant
 This server handles requests from the Supabase Edge Functions and connects to Google's Gemini API.
 """
 import os
+import sys
 import json
 import time
 import logging
-import requests
+import platform
+import re
 import subprocess
 import webbrowser
-import platform
-from typing import Dict, Any, Optional, List
-from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-import uvicorn
-import google.generativeai as genai
-from dotenv import load_dotenv
 from urllib.parse import urlparse
+from typing import Dict, Any, Optional, List
 from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-# Comment out problematic import and add alternative implementation
-# from comtypes.win32 import AudioUtilities, IAudioEndpointVolume
-import re
-from pyngrok import ngrok, conf
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+
+# Import dotenv for environment variables
+try:
+    from dotenv import load_dotenv
+    dotenv_available = True
+except ImportError:
+    dotenv_available = False
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("api-server")
+
+# FastAPI imports
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+
+# Third-party imports
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    rate_limiting_available = True
+except ImportError:
+    logger.warning("slowapi not installed, rate limiting will not be available")
+    rate_limiting_available = False
+    
+try:
+    import google.generativeai as genai
+    gemini_available = True
+    logger.info("Gemini API imported successfully")
+except ImportError:
+    logger.warning("google.generativeai not installed, Gemini API will not be available")
+    gemini_available = False
+
+try:
+    import pyngrok.conf
+    from pyngrok import ngrok, conf
+    ngrok_available = True
+    logger.info("ngrok imported successfully")
+except ImportError:
+    logger.warning("pyngrok not installed, ngrok tunneling will not be available")
+    ngrok_available = False
+    
+try:
+    import uvicorn
+    uvicorn_available = True
+    logger.info("uvicorn imported successfully")
+except ImportError:
+    logger.warning("uvicorn not installed, server cannot be started")
+    uvicorn_available = False
+
+# Check Jarvis integration
+try:
+    import jarvis_bridge
+    jarvis_available = True
+    logger.info("Jarvis bridge imported successfully")
+except ImportError:
+    jarvis_available = False
+    logger.warning("Jarvis bridge not available")
+    
+# Check RAG integration
+try:
+    import rag_engine
+    rag_available = True
+    logger.info("RAG engine imported successfully")
+except ImportError:
+    rag_available = False
+    logger.warning("RAG engine not available")
 
 # Load environment variables
-load_dotenv()
+if dotenv_available:
+    load_dotenv()
+    logger.info("Loaded environment variables from .env file")
+else:
+    logger.warning("python-dotenv not installed, skipping .env file loading")
 
 # Import RAG assistant if available
 try:
@@ -38,96 +102,6 @@ try:
     rag_available = True
 except ImportError:
     rag_available = False
-
-# Import Jarvis bridge
-try:
-    import jarvis_bridge
-    jarvis_available = True
-    logger.info("Jarvis bridge imported successfully")
-except ImportError as e:
-    jarvis_available = False
-    logger.warning(f"Jarvis bridge import failed: {str(e)}")
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("aura-api")
-
-# Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
-
-# Initialize FastAPI app
-app = FastAPI(
-    title="AURA API",
-    description="API server for AURA - Augmented User Response Assistant",
-    version="1.0.0"
-)
-
-# Add rate limiter to the app
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# Global error handler
-@app.middleware("http")
-async def catch_exceptions_middleware(request: Request, call_next):
-    """Global error handling middleware for all requests"""
-    try:
-        return await call_next(request)
-    except Exception as e:
-        logger.error(f"Unhandled exception in request: {str(e)}")
-        
-        # Get the exception traceback
-        import traceback
-        error_details = traceback.format_exc()
-        logger.error(error_details)
-        
-        # Return a JSON response with error details
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "message": f"Internal server error: {str(e)}",
-                "path": request.url.path,
-                "timestamp": time.time(),
-                "request_id": request.headers.get("X-Request-ID", "unknown")
-            }
-        )
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to your frontend domains
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Configure Gemini API
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDT70dXIaCcjZsB8ktCGQlbMqLnQ5PW2RU")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-pro-latest") # Updated model name
-genai.configure(api_key=GEMINI_API_KEY)
-
-# Models
-class MessageRequest(BaseModel):
-    message: str
-
-class CommandRequest(BaseModel):
-    command: str
-    use_jarvis: bool = False
-
-class TTSRequest(BaseModel):
-    text: str
-
-# Jarvis-specific models
-class JarvisStatusResponse(BaseModel):
-    initialized: bool
-    running: bool
-    components: Dict[str, bool]
-
-class JarvisActionRequest(BaseModel):
-    action: str  # 'initialize', 'start', 'stop'
 
 # Global state
 last_command_result = None
@@ -409,6 +383,83 @@ def execute_command(command: str) -> Dict[str, Any]:
             "command": command
         }
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="AURA API",
+    description="API server for AURA - Augmented User Response Assistant",
+    version="1.0.0"
+)
+
+# Add rate limiter to the app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Mount static directory for serving audio files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Global error handler
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    """Global error handling middleware for all requests"""
+    try:
+        return await call_next(request)
+    except Exception as e:
+        logger.error(f"Unhandled exception in request: {str(e)}")
+        
+        # Get the exception traceback
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(error_details)
+        
+        # Return a JSON response with error details
+        return HTMLResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": f"Internal server error: {str(e)}",
+                "path": request.url.path,
+                "timestamp": time.time(),
+                "request_id": request.headers.get("X-Request-ID", "unknown")
+            }
+        )
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, restrict this to your frontend domains
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Configure Gemini API
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDT70dXIaCcjZsB8ktCGQlbMqLnQ5PW2RU")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-pro-latest") # Updated model name
+genai.configure(api_key=GEMINI_API_KEY)
+
+# Models
+class MessageRequest(BaseModel):
+    message: str
+
+class CommandRequest(BaseModel):
+    command: str
+    use_jarvis: bool = False
+
+class TTSRequest(BaseModel):
+    text: str
+
+# Jarvis-specific models
+class JarvisStatusResponse(BaseModel):
+    initialized: bool
+    running: bool
+    components: Dict[str, bool]
+
+class JarvisActionRequest(BaseModel):
+    action: str  # 'initialize', 'start', 'stop'
+
 # Endpoints
 @app.get("/")
 async def root():
@@ -469,14 +520,40 @@ async def execute(request: CommandRequest, background_tasks: BackgroundTasks, re
 @app.post("/tts")
 async def text_to_speech(request: TTSRequest):
     """Convert text to speech"""
-    # This is a mock implementation
-    # In a real implementation, you would integrate with a TTS service
-    
     try:
-        # Mock TTS response
+        from gtts import gTTS
+        import uuid
+        import os
+        
+        # Create a unique filename for this audio
+        filename = f"tts_{uuid.uuid4()}.mp3"
+        output_path = os.path.join("static", "audio")
+        
+        # Ensure directory exists
+        os.makedirs(output_path, exist_ok=True)
+        
+        full_path = os.path.join(output_path, filename)
+        
+        # Generate speech using gTTS
+        tts = gTTS(text=request.text, lang='en', slow=False)
+        tts.save(full_path)
+        
+        # Return the URL to the audio file
+        audio_url = f"/static/audio/{filename}"
+        
+        # Calculate estimated duration (rough estimate: 150 chars per 10 seconds)
+        duration = len(request.text) / 15
+        
+        return {
+            "audioUrl": audio_url,
+            "duration": duration
+        }
+    except ImportError:
+        # Fallback to mock if gtts is not installed
+        logger.warning("gtts not installed, using mock TTS response")
         return {
             "audioUrl": "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm.ogg",
-            "duration": len(request.text) / 20  # Rough estimate: 20 chars per second
+            "duration": len(request.text) / 20
         }
     except Exception as e:
         logger.error(f"Error in TTS endpoint: {str(e)}")

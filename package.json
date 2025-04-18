@@ -1,27 +1,29 @@
 {
-  "name": "srm-college-ai-assistant",
-  "private": true,
-  "version": "0.1.0",
+  "name": "aura-web",
+  "version": "1.0.0",
+  "description": "Web interface for AURA AI assistant with Jarvis integration",
+  "main": "src/index.js",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "api": "python api_server.py",
+    "dev": "concurrently \"npm run api\" \"npm start\""
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.0",
-    "@splinetool/react-spline": "^4.0.0",
-    "@supabase/supabase-js": "^2.49.4",
-    "framer-motion": "^10.16.5",
+    "@splinetool/react-spline": "^2.2.6",
+    "@splinetool/runtime": "^0.9.425",
+    "framer-motion": "^10.12.10",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-window": "^1.8.11",
-    "styled-components": "^6.1.1"
+    "react-scripts": "5.0.1",
+    "styled-components": "^5.3.10"
   },
   "devDependencies": {
-    "@types/react": "^18.2.37",
-    "@types/react-dom": "^18.2.15",
-    "react-scripts": "5.0.1"
+    "concurrently": "^8.2.1",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.3.1"
   },
   "browserslist": {
     "production": [
