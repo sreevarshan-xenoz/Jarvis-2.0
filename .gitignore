@@ -76,3 +76,4 @@ secrets.json
 
 # Ngrok specific files
 .ngrok/ 
+.vercel

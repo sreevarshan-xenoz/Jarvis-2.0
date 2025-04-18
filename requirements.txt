@@ -1,26 +1,4 @@
-# Core dependencies
-SpeechRecognition==3.8.1
-pyttsx3==2.90
-PyAudio==0.2.13
-Pillow==10.1.0
-numpy==1.26.3
-
-# Service dependencies
-wikipedia==1.4.0
-pyjokes==0.6.0
-psutil==5.9.8
-ollama==0.1.6
-python-dotenv==1.0.0
-
-# Optional: Audio playback
-pywin32==306  # For Windows
-python-vlc==3.0.20000  # For cross-platform media playback
-
-# Additional utilities
-requests==2.31.0  # For API calls
-beautifulsoup4==4.12.3  # For web scraping
-
-# RAG dependencies
-langchain==0.1.1
-chromadb==0.4.22
-sentence-transformers==2.2.2
+gradio>=4.19.0
+transformers==4.51.3
+torch>=2.0.0
+accelerate>=0.24.1 

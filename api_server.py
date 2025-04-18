@@ -47,6 +47,14 @@ except ImportError:
     rate_limiting_available = False
     
 try:
+    from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+    huggingface_available = True
+    logger.info("Hugging Face transformers imported successfully")
+except ImportError:
+    huggingface_available = False
+    logger.warning("transformers not installed, Hugging Face model will not be available")
+    
+try:
     import google.generativeai as genai
     gemini_available = True
     logger.info("Gemini API imported successfully")
@@ -96,6 +104,15 @@ if dotenv_available:
 else:
     logger.warning("python-dotenv not installed, skipping .env file loading")
 
+# Configure Gemini API
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDT70dXIaCcjZsB8ktCGQlbMqLnQ5PW2RU")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-pro-latest") # Updated model name
+
+# Configure Hugging Face model
+HF_MODEL_NAME = os.environ.get("HF_MODEL_NAME", "naxwinn/qlora-jarvis-output")
+# Don't use Hugging Face model on Vercel due to size limitations
+USE_HUGGINGFACE = os.environ.get("USE_HUGGINGFACE", "true").lower() == "true" and os.environ.get("VERCEL_ENV") is None
+
 # Import RAG assistant if available
 try:
     from rag_assistant import query_rag_model
@@ -108,14 +125,15 @@ last_command_result = None
 model_status = {
     "last_checked": 0,
     "online": False,
-    "model": GEMINI_MODEL,
+    "model": GEMINI_MODEL if not USE_HUGGINGFACE else HF_MODEL_NAME,
+    "provider": "Google Gemini" if not USE_HUGGINGFACE else "Hugging Face",
     "memory_usage": None,
     "load": None
 }
 
 # Helper functions
-def check_gemini_status() -> Dict[str, Any]:
-    """Check if Gemini API is available"""
+def check_model_status() -> Dict[str, Any]:
+    """Check if the AI model (Gemini API or Hugging Face) is available"""
     global model_status
     
     # Don't check more often than every 10 seconds
@@ -123,6 +141,46 @@ def check_gemini_status() -> Dict[str, Any]:
     if current_time - model_status["last_checked"] < 10:
         return model_status
     
+    # Check Hugging Face model if enabled
+    if huggingface_available and USE_HUGGINGFACE:
+        try:
+            if hf_model is None or hf_tokenizer is None:
+                raise ValueError("Hugging Face model not properly initialized")
+                
+            # Simple test query to check if the model is responsive
+            test_input = "Hello"
+            test_prompt = f"User: {test_input}\n\nAssistant:"
+            
+            _ = hf_generator(
+                test_prompt,
+                max_length=50,
+                num_return_sequences=1,
+                pad_token_id=hf_tokenizer.eos_token_id,
+                temperature=0.7
+            )
+            
+            model_status.update({
+                "last_checked": current_time,
+                "online": True,
+                "status": "Hugging Face model is online",
+                "model": HF_MODEL_NAME,
+                "provider": "Hugging Face",
+                "memory_usage": "Local model",
+                "load": 0.0  # We don't track load for local models
+            })
+            return model_status
+        except Exception as e:
+            logger.error(f"Error checking Hugging Face model status: {str(e)}")
+            model_status.update({
+                "last_checked": current_time,
+                "online": False,
+                "status": f"Error connecting to Hugging Face model: {str(e)}",
+                "provider": "Hugging Face",
+                "model": HF_MODEL_NAME
+            })
+            return model_status
+    
+    # Check Gemini API if Hugging Face is not enabled
     try:
         # Simple test query to check if the API is responsive
         model = genai.GenerativeModel(GEMINI_MODEL)
@@ -133,6 +191,7 @@ def check_gemini_status() -> Dict[str, Any]:
             "online": True,
             "status": "Gemini API is online",
             "model": GEMINI_MODEL,
+            "provider": "Google Gemini",
             "memory_usage": "N/A (Cloud API)",
             "load": 0.0  # Cloud API doesn't expose load metrics
         })
@@ -143,12 +202,51 @@ def check_gemini_status() -> Dict[str, Any]:
         model_status.update({
             "last_checked": current_time,
             "online": False,
-            "status": f"Error connecting to Gemini API: {str(e)}"
+            "status": f"Error connecting to Gemini API: {str(e)}",
+            "provider": "Google Gemini",
+            "model": GEMINI_MODEL
         })
         return model_status
 
+def query_huggingface(prompt: str, system_prompt: Optional[str] = None) -> str:
+    """Query the Hugging Face model"""
+    try:
+        if hf_generator is None:
+            raise ValueError("Hugging Face model not loaded")
+        
+        # Format the prompt with system prompt if provided
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\nUser: {prompt}\n\nAssistant:"
+        else:
+            full_prompt = f"User: {prompt}\n\nAssistant:"
+        
+        # Generate response from the model
+        response = hf_generator(
+            full_prompt,
+            max_length=1024,
+            num_return_sequences=1,
+            pad_token_id=hf_tokenizer.eos_token_id,
+            temperature=0.7,
+            top_p=0.95,
+            do_sample=True
+        )
+        
+        # Extract the generated text and remove the prompt
+        generated_text = response[0]['generated_text']
+        answer = generated_text.split("Assistant:", 1)[-1].strip()
+        
+        return answer
+    except Exception as e:
+        logger.error(f"Error querying Hugging Face model: {str(e)}")
+        return f"Error: {str(e)}"
+
 def query_gemini(prompt: str, system_prompt: Optional[str] = None) -> str:
-    """Query the Gemini API"""
+    """Query the Gemini API or Hugging Face model based on configuration"""
+    # If Hugging Face model is available and enabled, use it instead of Gemini
+    if huggingface_available and USE_HUGGINGFACE and hf_generator is not None:
+        return query_huggingface(prompt, system_prompt)
+        
+    # Otherwise, use Gemini
     try:
         # Configure the model
         generation_config = {
@@ -339,7 +437,7 @@ def execute_command(command: str) -> Dict[str, Any]:
     
     # Status command
     if command in ["status", "health", "check"]:
-        status = check_gemini_status()
+        status = check_model_status()
         return {
             "success": True,
             "message": f"System status: {status['status']}",
@@ -435,10 +533,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure Gemini API
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDT70dXIaCcjZsB8ktCGQlbMqLnQ5PW2RU")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-pro-latest") # Updated model name
-genai.configure(api_key=GEMINI_API_KEY)
+# Initialize models
+hf_model = None
+hf_tokenizer = None
+hf_generator = None
+
+if huggingface_available and USE_HUGGINGFACE:
+    try:
+        logger.info(f"Loading Hugging Face model: {HF_MODEL_NAME}")
+        hf_tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_NAME)
+        hf_model = AutoModelForCausalLM.from_pretrained(HF_MODEL_NAME)
+        hf_generator = pipeline("text-generation", model=hf_model, tokenizer=hf_tokenizer)
+        logger.info("Hugging Face model loaded successfully")
+    except Exception as e:
+        logger.error(f"Error loading Hugging Face model: {str(e)}")
+        USE_HUGGINGFACE = False
+
+# Configure Gemini if Hugging Face is not available or not used
+if gemini_available and (not huggingface_available or not USE_HUGGINGFACE):
+    genai.configure(api_key=GEMINI_API_KEY)
+    logger.info(f"Using Gemini model: {GEMINI_MODEL}")
+else:
+    logger.info("Gemini API will not be used")
 
 # Models
 class MessageRequest(BaseModel):
@@ -469,7 +585,7 @@ async def root():
 @app.get("/status")
 async def status():
     """Get model status"""
-    return check_gemini_status()
+    return check_model_status()
 
 @app.post("/query")
 @limiter.limit("20/minute")
@@ -527,7 +643,14 @@ async def text_to_speech(request: TTSRequest):
         
         # Create a unique filename for this audio
         filename = f"tts_{uuid.uuid4()}.mp3"
-        output_path = os.path.join("static", "audio")
+        
+        # Use public directory for Vercel, static directory otherwise
+        if os.environ.get("VERCEL_ENV"):
+            output_path = os.path.join("public", "static", "audio")
+            audio_url_prefix = "/static/audio"  # Vercel serves files from public directly
+        else:
+            output_path = os.path.join("static", "audio")
+            audio_url_prefix = "/static/audio"
         
         # Ensure directory exists
         os.makedirs(output_path, exist_ok=True)
@@ -539,7 +662,7 @@ async def text_to_speech(request: TTSRequest):
         tts.save(full_path)
         
         # Return the URL to the audio file
-        audio_url = f"/static/audio/{filename}"
+        audio_url = f"{audio_url_prefix}/{filename}"
         
         # Calculate estimated duration (rough estimate: 150 chars per 10 seconds)
         duration = len(request.text) / 15
@@ -609,76 +732,89 @@ async def get_integrations():
     }
 
 if __name__ == "__main__":
+    # This block only runs when executed directly, not on Vercel
     port = int(os.environ.get("PORT", 8000))
     logger.info(f"Starting AURA API server on port {port}")
-    logger.info(f"Using Gemini API with key: {GEMINI_API_KEY[:5]}...")
     
-    # Set up ngrok tunnel
-    try:
-        # Set up auth token if provided
-        ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "2vuDgkjBttqOoLWBXiPKZg2VfBd_3iNs6ZiMPfL9pHgNmGKFo")
-        conf.get_default().auth_token = ngrok_auth_token
-        
-        # Configure ngrok with heartbeat monitoring
-        conf.get_default().monitor_thread = True
-        conf.get_default().heartbeat_interval = 30
-        conf.get_default().reconnect_attempts = 5
-        conf.get_default().reconnect_wait = 2
-        
-        # Start ngrok tunnel
-        # Use the simplest connect method
-        public_url = ngrok.connect(port).public_url
-        logger.info(f"AURA API Server accessible via ngrok tunnel: {public_url}")
-        logger.info(f"Use these URLs in your Supabase environment variables:")
-        logger.info(f"GEMINI_API_URL: {public_url}/chat")
-        logger.info(f"COMMAND_API_URL: {public_url}/execute")
-        logger.info(f"STATUS_API_URL: {public_url}/status")
-        logger.info(f"TTS_API_URL: {public_url}/tts")
-        
-        # Run the URL updater script to automatically update Supabase
+    if USE_HUGGINGFACE and huggingface_available:
+        logger.info(f"Using Hugging Face model: {HF_MODEL_NAME}")
+    else:
+        logger.info(f"Using Gemini API with key: {GEMINI_API_KEY[:5]}...")
+    
+    # Set up ngrok tunnel - only when running locally
+    if ngrok_available and os.environ.get("VERCEL_ENV") is None:
         try:
-            logger.info("Launching URL updater script to update Supabase environment variables...")
-            # Start in a new process so it doesn't block the server
-            subprocess.Popen(["python", "update_urls.py"])
-        except Exception as e:
-            logger.error(f"Failed to launch URL updater script: {str(e)}")
-            logger.info("You will need to update Supabase environment variables manually")
+            # Set up auth token if provided
+            ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "2vuDgkjBttqOoLWBXiPKZg2VfBd_3iNs6ZiMPfL9pHgNmGKFo")
+            conf.get_default().auth_token = ngrok_auth_token
             
-        # Set up a background task to monitor ngrok tunnel health
-        def monitor_tunnel():
+            # Configure ngrok with heartbeat monitoring
+            conf.get_default().monitor_thread = True
+            conf.get_default().heartbeat_interval = 30
+            conf.get_default().reconnect_attempts = 5
+            conf.get_default().reconnect_wait = 2
+            
+            # Start ngrok tunnel
+            # Use the simplest connect method
+            public_url = ngrok.connect(port).public_url
+            logger.info(f"AURA API Server accessible via ngrok tunnel: {public_url}")
+            logger.info(f"Use these URLs in your Supabase environment variables:")
+            logger.info(f"GEMINI_API_URL: {public_url}/chat")
+            logger.info(f"COMMAND_API_URL: {public_url}/execute")
+            logger.info(f"STATUS_API_URL: {public_url}/status")
+            logger.info(f"TTS_API_URL: {public_url}/tts")
+            
+            # Run the URL updater script to automatically update Supabase
             try:
-                import threading
-                import time
-                
-                def check_tunnel():
-                    while True:
-                        try:
-                            # Check if the tunnel is still alive
-                            tunnels = ngrok.get_tunnels()
-                            if not tunnels:
-                                logger.warning("No active ngrok tunnels found! Attempting to reconnect...")
-                                new_tunnel = ngrok.connect(port)
-                                logger.info(f"Reestablished ngrok tunnel: {new_tunnel.public_url}")
-                                # Update Supabase variables with new URL
-                                subprocess.Popen(["python", "update_urls.py"])
-                            time.sleep(60)  # Check every minute
-                        except Exception as e:
-                            logger.error(f"Error in tunnel monitoring: {str(e)}")
-                            time.sleep(10)  # Wait before retrying
-                
-                # Start the monitoring in a background thread
-                monitor_thread = threading.Thread(target=check_tunnel, daemon=True)
-                monitor_thread.start()
-                logger.info("Started ngrok tunnel monitoring")
-                
+                logger.info("Launching URL updater script to update Supabase environment variables...")
+                # Start in a new process so it doesn't block the server
+                subprocess.Popen(["python", "update_urls.py"])
             except Exception as e:
-                logger.error(f"Failed to set up tunnel monitoring: {str(e)}")
-        
-        # Start the monitoring
-        monitor_tunnel()
+                logger.error(f"Failed to launch URL updater script: {str(e)}")
+                logger.info("You will need to update Supabase environment variables manually")
+                
+            # Set up a background task to monitor ngrok tunnel health
+            def monitor_tunnel():
+                try:
+                    import threading
+                    import time
+                    
+                    def check_tunnel():
+                        while True:
+                            try:
+                                # Check if the tunnel is still alive
+                                tunnels = ngrok.get_tunnels()
+                                if not tunnels:
+                                    logger.warning("No active ngrok tunnels found! Attempting to reconnect...")
+                                    new_tunnel = ngrok.connect(port)
+                                    logger.info(f"Reestablished ngrok tunnel: {new_tunnel.public_url}")
+                                    # Update Supabase variables with new URL
+                                    subprocess.Popen(["python", "update_urls.py"])
+                                time.sleep(60)  # Check every minute
+                            except Exception as e:
+                                logger.error(f"Error in tunnel monitoring: {str(e)}")
+                                time.sleep(10)  # Wait before retrying
+                    
+                    # Start the monitoring in a background thread
+                    monitor_thread = threading.Thread(target=check_tunnel, daemon=True)
+                    monitor_thread.start()
+                    logger.info("Started ngrok tunnel monitoring")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to set up tunnel monitoring: {str(e)}")
             
-    except Exception as e:
-        logger.error(f"Failed to create ngrok tunnel: {str(e)}")
-        logger.info("Continuing without ngrok tunnel...")
+            # Start the monitoring
+            monitor_tunnel()
+                
+        except Exception as e:
+            logger.error(f"Failed to create ngrok tunnel: {str(e)}")
+            logger.info("Continuing without ngrok tunnel...")
     
-    uvicorn.run("api_server:app", host="0.0.0.0", port=port, reload=True) 
+    uvicorn.run("api_server:app", host="0.0.0.0", port=port, reload=True)
+else:
+    # When imported by Vercel, log the initialization
+    logger.info("AURA API initialized for serverless deployment")
+    if USE_HUGGINGFACE and huggingface_available:
+        logger.info(f"Using Hugging Face model: {HF_MODEL_NAME}")
+    else:
+        logger.info(f"Using Gemini API with key: {GEMINI_API_KEY[:5]}...") 
