@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled, { ThemeProvider } from 'styled-components';
 import Spline from '@splinetool/react-spline';
-import { darkTheme } from './themes/darkTheme';
 import ChatInterface from './components/ChatInterface';
 import Header from './components/Header';
 import DiagnosticPanel from './components/DiagnosticPanel';
+import JarvisIntegration from './components/JarvisIntegration';
 import aiService from './services/aiService';
 
 const AppContainer = styled.div`
@@ -216,11 +216,37 @@ const WatermarkCover = styled.div`
   pointer-events: none;
 `;
 
+// Keep the dark theme for consistency
+const darkTheme = {
+  background: '#121212',
+  text: '#e0e0e0',
+  primary: '#42dcdb',
+  secondary: '#a18fff',
+  accent: '#ff8a80',
+  panel: 'rgba(30, 30, 40, 0.7)',
+  card: 'rgba(25, 25, 35, 0.8)',
+  shadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+  success: '#66BB6A',
+  error: '#EF5350',
+  warning: '#FFA726',
+  info: '#42A5F5'
+};
+
 function App() {
+  const [messages, setMessages] = useState(() => {
+    // Load messages from localStorage if available
+    const savedMessages = localStorage.getItem('aura_messages');
+    return savedMessages ? JSON.parse(savedMessages) : [{
+      id: 1,
+      role: 'assistant',
+      content: "Hello! I'm AURA, your Augmented User Response Assistant. How can I assist you today?"
+    }];
+  });
   const [command, setCommand] = useState('');
-  const [modelStatus, setModelStatus] = useState({ online: false, status: 'Checking model status...' });
-  const [notification, setNotification] = useState(null);
+  const [modelStatus, setModelStatus] = useState({ online: false, status: 'Checking status...' });
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const [notification, setNotification] = useState(null);
+  const [useJarvis, setUseJarvis] = useState(false);
   const backgroundSplineRef = useRef();
   const foregroundSplineRef = useRef();
 
@@ -233,6 +259,11 @@ function App() {
     
     return () => clearInterval(statusInterval);
   }, []);
+
+  useEffect(() => {
+    // Save messages to localStorage whenever they change
+    localStorage.setItem('aura_messages', JSON.stringify(messages));
+  }, [messages]);
 
   const checkModelStatus = async () => {
     try {
@@ -269,7 +300,7 @@ function App() {
     try {
       showNotification('Executing command...');
       
-      const result = await aiService.executeCommand(userCommand);
+      const result = await aiService.executeCommand(userCommand, useJarvis);
       
       if (result.success) {
         showNotification(result.message || 'Command executed successfully');
@@ -287,6 +318,23 @@ function App() {
     setTimeout(() => setNotification(null), 5000);
   };
 
+  // Keep clearChatHistory function
+  const clearChatHistory = () => {
+    const initialMessage = {
+      id: Date.now(),
+      role: 'assistant',
+      content: "Chat history cleared. How can I assist you today?"
+    };
+    setMessages([initialMessage]);
+    showNotification("Chat history cleared");
+  };
+
+  // Handle Jarvis toggle
+  const handleUseJarvisChange = (value) => {
+    setUseJarvis(value);
+    showNotification(value ? 'Switched to Jarvis' : 'Switched to AURA AI');
+  };
+
   return (
     <ThemeProvider theme={darkTheme}>
       <AppContainer>
@@ -295,6 +343,39 @@ function App() {
         <WatermarkCover style={{ bottom: '10px', right: '10px' }} />
         <WatermarkCover style={{ bottom: '10px', right: '0' }} />
         <WatermarkCover style={{ bottom: '0', right: '10px' }} />
+        
+        <JarvisIntegration onUseJarvisChange={handleUseJarvisChange} />
+        
+        <motion.button
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '200px',
+            background: 'rgba(30, 30, 50, 0.7)',
+            border: '1px solid rgba(255, 87, 87, 0.4)',
+            borderRadius: '20px',
+            color: 'rgba(255, 87, 87, 0.8)',
+            fontSize: '12px',
+            padding: '6px 12px',
+            cursor: 'pointer',
+            zIndex: 10,
+            backdropFilter: 'blur(4px)'
+          }}
+          onClick={clearChatHistory}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          Clear History
+        </motion.button>
+        
+        <DiagnosticButton
+          onClick={() => setShowDiagnostic(true)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <DiagnosticIcon isOnline={modelStatus.online} />
+          Run Diagnostic
+        </DiagnosticButton>
         
         {/* The newer 3D scene forms the solid background */}
         <SplineBackgroundContainer>
@@ -315,15 +396,6 @@ function App() {
             hideAttribution={true}
           />
         </SplineForegroundContainer>
-        
-        <DiagnosticButton
-          onClick={() => setShowDiagnostic(true)}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <DiagnosticIcon isOnline={modelStatus.online} />
-          Run Diagnostic
-        </DiagnosticButton>
         
         <AnimatePresence>
           {showDiagnostic && (

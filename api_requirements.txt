@@ -8,4 +8,5 @@ google-generativeai==0.3.1
 comtypes==1.1.14
 pycaw==20220416
 pywin32==306
-pyngrok==6.0.0 
+pyngrok==6.0.0
+slowapi==0.1.8 

@@ -24,6 +24,10 @@ from comtypes import CLSCTX_ALL
 # Comment out problematic import and add alternative implementation
 # from comtypes.win32 import AudioUtilities, IAudioEndpointVolume
 import re
+from pyngrok import ngrok, conf
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Load environment variables
 load_dotenv()
@@ -35,6 +39,15 @@ try:
 except ImportError:
     rag_available = False
 
+# Import Jarvis bridge
+try:
+    import jarvis_bridge
+    jarvis_available = True
+    logger.info("Jarvis bridge imported successfully")
+except ImportError as e:
+    jarvis_available = False
+    logger.warning(f"Jarvis bridge import failed: {str(e)}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -42,12 +55,45 @@ logging.basicConfig(
 )
 logger = logging.getLogger("aura-api")
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Initialize FastAPI app
 app = FastAPI(
     title="AURA API",
     description="API server for AURA - Augmented User Response Assistant",
     version="1.0.0"
 )
+
+# Add rate limiter to the app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Global error handler
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    """Global error handling middleware for all requests"""
+    try:
+        return await call_next(request)
+    except Exception as e:
+        logger.error(f"Unhandled exception in request: {str(e)}")
+        
+        # Get the exception traceback
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(error_details)
+        
+        # Return a JSON response with error details
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": f"Internal server error: {str(e)}",
+                "path": request.url.path,
+                "timestamp": time.time(),
+                "request_id": request.headers.get("X-Request-ID", "unknown")
+            }
+        )
 
 # Configure CORS
 app.add_middleware(
@@ -69,9 +115,19 @@ class MessageRequest(BaseModel):
 
 class CommandRequest(BaseModel):
     command: str
+    use_jarvis: bool = False
 
 class TTSRequest(BaseModel):
     text: str
+
+# Jarvis-specific models
+class JarvisStatusResponse(BaseModel):
+    initialized: bool
+    running: bool
+    components: Dict[str, bool]
+
+class JarvisActionRequest(BaseModel):
+    action: str  # 'initialize', 'start', 'stop'
 
 # Global state
 last_command_result = None
@@ -365,44 +421,43 @@ async def status():
     return check_gemini_status()
 
 @app.post("/query")
-async def query(request: MessageRequest):
-    """Query the Gemini model"""
-    logger.info(f"Query received: {request.message}")
-    
-    # Check if RAG should be used
-    if rag_available and "use rag" in request.message.lower():
-        try:
-            response = query_rag_model(request.message)
-            return {
-                "response": response,
-                "model": "RAG-Assistant"
-            }
-        except Exception as e:
-            logger.error(f"Error querying RAG model: {str(e)}")
-    
-    # Default to Gemini
+@limiter.limit("20/minute")
+async def query(request: MessageRequest, request_obj: Request):
+    """Query the model with a message"""
     try:
-        system_prompt = """You are AURA, a helpful AI assistant. Always be concise, helpful, and direct in your responses.
-        Focus on providing accurate and relevant information. If you don't know something, admit it."""
+        # Prepare system prompt
+        system_prompt = "You are AURA, an advanced AI assistant. Provide helpful, accurate, and concise responses."
         
+        # Get response from the model
         response = query_gemini(request.message, system_prompt)
+        
         return {
+            "success": True,
             "response": response,
             "model": GEMINI_MODEL
         }
     except Exception as e:
-        logger.error(f"Error processing query: {str(e)}")
-        return {"response": f"Error: {str(e)}", "model": "Error"}
+        logger.error(f"Error in query endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/execute")
-async def execute(request: CommandRequest, background_tasks: BackgroundTasks):
+@limiter.limit("10/minute")
+async def execute(request: CommandRequest, background_tasks: BackgroundTasks, request_obj: Request):
     """Execute a command"""
     global last_command_result
     
     try:
-        result = execute_command(request.command)
-        last_command_result = result
-        return result
+        # Check if we should route to Jarvis
+        if request.use_jarvis and jarvis_available:
+            # Process command through Jarvis
+            result = jarvis_bridge.process_jarvis_command(request.command)
+            last_command_result = result
+            return result
+        else:
+            # Use the standard command execution
+            result = execute_command(request.command)
+            last_command_result = result
+            return result
     except Exception as e:
         logger.error(f"Error executing command: {str(e)}")
         return {
@@ -434,6 +489,48 @@ async def get_last_command():
         return {"message": "No command has been executed yet"}
     return last_command_result
 
+# Jarvis-specific endpoints
+@app.get("/jarvis/status", response_model=JarvisStatusResponse)
+async def jarvis_status():
+    """Get status of the Jarvis system"""
+    if not jarvis_available:
+        raise HTTPException(status_code=503, detail="Jarvis integration is not available")
+    
+    return jarvis_bridge.get_jarvis_status()
+
+@app.post("/jarvis/action")
+async def jarvis_action(request: JarvisActionRequest):
+    """Perform an action on the Jarvis system"""
+    if not jarvis_available:
+        raise HTTPException(status_code=503, detail="Jarvis integration is not available")
+    
+    action = request.action.lower()
+    result = False
+    message = ""
+    
+    if action == "initialize":
+        result = jarvis_bridge.initialize_jarvis()
+        message = "Jarvis initialized successfully" if result else "Failed to initialize Jarvis"
+    elif action == "start":
+        result = jarvis_bridge.start_jarvis()
+        message = "Jarvis started successfully" if result else "Failed to start Jarvis"
+    elif action == "stop":
+        result = jarvis_bridge.stop_jarvis()
+        message = "Jarvis stopped successfully" if result else "Failed to stop Jarvis"
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+    
+    return {"success": result, "message": message, "action": action}
+
+@app.get("/integrations")
+async def get_integrations():
+    """Get available integrations"""
+    return {
+        "jarvis": jarvis_available,
+        "rag": rag_available,
+        "tts": True  # TTS is always available (mock or real)
+    }
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     logger.info(f"Starting AURA API server on port {port}")
@@ -441,10 +538,15 @@ if __name__ == "__main__":
     
     # Set up ngrok tunnel
     try:
-        from pyngrok import ngrok, conf
         # Set up auth token if provided
         ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "2vuDgkjBttqOoLWBXiPKZg2VfBd_3iNs6ZiMPfL9pHgNmGKFo")
         conf.get_default().auth_token = ngrok_auth_token
+        
+        # Configure ngrok with heartbeat monitoring
+        conf.get_default().monitor_thread = True
+        conf.get_default().heartbeat_interval = 30
+        conf.get_default().reconnect_attempts = 5
+        conf.get_default().reconnect_wait = 2
         
         # Start ngrok tunnel
         # Use the simplest connect method
@@ -455,6 +557,49 @@ if __name__ == "__main__":
         logger.info(f"COMMAND_API_URL: {public_url}/execute")
         logger.info(f"STATUS_API_URL: {public_url}/status")
         logger.info(f"TTS_API_URL: {public_url}/tts")
+        
+        # Run the URL updater script to automatically update Supabase
+        try:
+            logger.info("Launching URL updater script to update Supabase environment variables...")
+            # Start in a new process so it doesn't block the server
+            subprocess.Popen(["python", "update_urls.py"])
+        except Exception as e:
+            logger.error(f"Failed to launch URL updater script: {str(e)}")
+            logger.info("You will need to update Supabase environment variables manually")
+            
+        # Set up a background task to monitor ngrok tunnel health
+        def monitor_tunnel():
+            try:
+                import threading
+                import time
+                
+                def check_tunnel():
+                    while True:
+                        try:
+                            # Check if the tunnel is still alive
+                            tunnels = ngrok.get_tunnels()
+                            if not tunnels:
+                                logger.warning("No active ngrok tunnels found! Attempting to reconnect...")
+                                new_tunnel = ngrok.connect(port)
+                                logger.info(f"Reestablished ngrok tunnel: {new_tunnel.public_url}")
+                                # Update Supabase variables with new URL
+                                subprocess.Popen(["python", "update_urls.py"])
+                            time.sleep(60)  # Check every minute
+                        except Exception as e:
+                            logger.error(f"Error in tunnel monitoring: {str(e)}")
+                            time.sleep(10)  # Wait before retrying
+                
+                # Start the monitoring in a background thread
+                monitor_thread = threading.Thread(target=check_tunnel, daemon=True)
+                monitor_thread.start()
+                logger.info("Started ngrok tunnel monitoring")
+                
+            except Exception as e:
+                logger.error(f"Failed to set up tunnel monitoring: {str(e)}")
+        
+        # Start the monitoring
+        monitor_tunnel()
+            
     except Exception as e:
         logger.error(f"Failed to create ngrok tunnel: {str(e)}")
         logger.info("Continuing without ngrok tunnel...")

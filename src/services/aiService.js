@@ -4,245 +4,175 @@ import supabase from './supabase';
 const FALLBACK_AUDIO_URL = 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg';
 
 /**
- * AI Service to handle interactions with the Gemma 2B model through Supabase
+ * AI Service - Handles communication with the API server for AI operations
  */
-class AIService {
-  /**
-   * Sends a message to the AI and gets a response
-   * @param {string} message - The user's message
-   * @returns {Promise<string>} - The AI's response
-   */
-  async sendMessage(message) {
-    try {
-      // For development testing purposes, return a mock successful response if Supabase isn't configured
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development mode detected, attempting to use Supabase function with fallback');
-        try {
-          const { data, error } = await supabase.functions.invoke('gemma-2b-chat', {
-            body: { message }
-          });
 
-          if (error) throw error;
-          return data.response;
-        } catch (error) {
-          console.warn('Could not connect to Supabase Edge Function in development mode, returning mock response');
-          
-          // Return mock response
-          const responses = [
-            "I'm a simulated response from the Gemma 2B model in development mode. Your actual model isn't connected yet.",
-            "This is a development mode response. The real Gemma 2B model will provide more helpful answers when connected.",
-            "Development mode activated. I'm not the real Gemma 2B model, just a placeholder until your backend is configured."
-          ];
-          
-          return responses[Math.floor(Math.random() * responses.length)];
-        }
-      }
+// Base URL for API calls
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-      // Production mode - Call the Edge Function in Supabase
-      const { data, error } = await supabase.functions.invoke('gemma-2b-chat', {
-        body: { message }
-      });
-
-      if (error) {
-        console.error('Error calling Gemma 2B model:', error);
-        throw new Error(error.message || 'Failed to get response from AI');
-      }
-
-      return data.response;
-    } catch (error) {
-      console.error('Error in AI service:', error);
-      throw error;
-    }
+// Helper function for API requests
+const apiRequest = async (endpoint, method = 'GET', body = null) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  
+  const options = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
+  
+  if (body) {
+    options.body = JSON.stringify(body);
   }
+  
+  try {
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `API error: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`API request failed (${url}):`, error);
+    throw error;
+  }
+};
 
+const aiService = {
   /**
-   * Executes a custom command using the Python backend
+   * Get current model status
+   */
+  getModelStatus: async () => {
+    return apiRequest('/status');
+  },
+  
+  /**
+   * Execute a command
    * @param {string} command - The command to execute
-   * @returns {Promise<object>} - The result of the command execution
+   * @param {boolean} useJarvis - Whether to route the command through Jarvis
    */
-  async executeCommand(command) {
-    try {
-      // Call the Edge Function in Supabase that will process the custom command
-      const { data, error } = await supabase.functions.invoke('execute-command', {
-        body: { command }
-      });
-
-      if (error) {
-        console.error('Error executing command:', error);
-        throw new Error(error.message || 'Failed to execute command');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in command execution:', error);
-      throw error;
-    }
-  }
-
+  executeCommand: async (command, useJarvis = false) => {
+    return apiRequest('/execute', 'POST', { 
+      command,
+      use_jarvis: useJarvis
+    });
+  },
+  
   /**
-   * Fetches the AI model status
-   * @returns {Promise<object>} - The status of the AI model
+   * Send a message to the AI assistant
+   * @param {string} message - The message to send
    */
-  async getModelStatus() {
-    try {
-      // For development testing purposes, return a mock successful response
-      // Remove this condition in production
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development mode detected, returning mock model status');
-        return {
-          online: true,
-          status: 'Gemma 2B model is online (Development Mode)',
-          model: 'Gemma 2B',
-          memory_usage: '4.2GB',
-          load: 0.3
-        };
-      }
-
-      const { data, error } = await supabase.functions.invoke('model-status', {
-        method: 'GET'
-      });
-
-      if (error) {
-        console.error('Error fetching model status:', error);
-        throw new Error(error.message || 'Failed to get model status');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in model status check:', error);
-      throw error;
-    }
-  }
-
+  sendMessage: async (message) => {
+    return apiRequest('/query', 'POST', { message });
+  },
+  
   /**
-   * Converts text to speech
+   * Convert text to speech
    * @param {string} text - The text to convert to speech
-   * @returns {Promise<object>} - The result containing the audio URL
    */
-  async textToSpeech(text) {
-    try {
-      // For development testing purposes, return a mock audio URL
-      // Remove this condition in production
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development mode detected, returning mock audio URL');
-        return {
-          audioUrl: FALLBACK_AUDIO_URL,
-          duration: 2.1
-        };
-      }
-
-      const { data, error } = await supabase.functions.invoke('text-to-speech', {
-        body: { text }
-      });
-
-      if (error) {
-        console.error('Error converting text to speech:', error);
-        throw new Error(error.message || 'Failed to convert text to speech');
-      }
-
-      if (!data || !data.audioUrl) {
-        console.error('Invalid response from text-to-speech function:', data);
-        throw new Error('No audio URL returned from service');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error in text-to-speech conversion:', error);
-      // In production, you might want to throw the error instead of returning a fallback
-      // For better UX during development, we'll return a fallback
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Returning fallback audio URL due to error');
-        return {
-          audioUrl: FALLBACK_AUDIO_URL,
-          duration: 2.1,
-          error: error.message
-        };
-      }
-      throw error;
-    }
-  }
-
+  textToSpeech: async (text) => {
+    return apiRequest('/tts', 'POST', { text });
+  },
+  
   /**
-   * Run a diagnostic test on the AI model
-   * @returns {Promise<object>} - The diagnostic results
+   * Run diagnostic tests on the AI system
    */
-  async runDiagnostic() {
+  runDiagnostic: async () => {
+    const tests = [];
+    
+    // Model status test
     try {
-      console.log('Running AI model diagnostic...');
-      
-      // 1. Test the model status
-      const statusResult = { success: false, message: '', details: {} };
-      try {
-        const status = await this.getModelStatus();
-        statusResult.success = status.online;
-        statusResult.message = status.online ? 'Model is online' : 'Model is offline';
-        statusResult.details = status;
-      } catch (error) {
-        statusResult.message = `Status check failed: ${error.message}`;
-        statusResult.details = { error: error.message };
-      }
-      
-      // 2. Test a simple inference request
-      const inferenceResult = { success: false, message: '', details: {} };
-      try {
-        const response = await this.sendMessage('Hello, this is a diagnostic test.');
-        inferenceResult.success = Boolean(response);
-        inferenceResult.message = response ? 'Inference test successful' : 'Inference test failed - no response';
-        inferenceResult.details = { response: response ? response.substring(0, 100) + '...' : 'No response' };
-      } catch (error) {
-        inferenceResult.message = `Inference test failed: ${error.message}`;
-        inferenceResult.details = { error: error.message };
-      }
-      
-      // 3. Test a simple command execution
-      const commandResult = { success: false, message: '', details: {} };
-      try {
-        const result = await this.executeCommand('status');
-        commandResult.success = Boolean(result && result.success);
-        commandResult.message = result && result.success ? 'Command test successful' : 'Command test failed';
-        commandResult.details = result || { error: 'No result returned' };
-      } catch (error) {
-        commandResult.message = `Command test failed: ${error.message}`;
-        commandResult.details = { error: error.message };
-      }
-      
-      // 4. Test text-to-speech functionality
-      const ttsResult = { success: false, message: '', details: {} };
-      try {
-        const result = await this.textToSpeech('This is a TTS test.');
-        ttsResult.success = Boolean(result && result.audioUrl);
-        ttsResult.message = result && result.audioUrl ? 'TTS test successful' : 'TTS test failed - no audio URL';
-        ttsResult.details = result || { error: 'No result returned' };
-      } catch (error) {
-        ttsResult.message = `TTS test failed: ${error.message}`;
-        ttsResult.details = { error: error.message };
-      }
-      
-      // Overall diagnostic result
-      const overallSuccess = statusResult.success && inferenceResult.success && 
-                            commandResult.success && ttsResult.success;
-                            
-      return {
-        success: overallSuccess,
-        message: overallSuccess ? 'All diagnostic tests passed' : 'Some diagnostic tests failed',
-        tests: {
-          modelStatus: statusResult,
-          inference: inferenceResult,
-          command: commandResult,
-          tts: ttsResult
-        },
-        timestamp: new Date().toISOString()
-      };
+      const status = await aiService.getModelStatus();
+      tests.push({
+        name: 'Model Status',
+        success: status.online,
+        message: status.status || (status.online ? 'Model is online' : 'Model is offline')
+      });
     } catch (error) {
-      console.error('Error running diagnostic:', error);
-      return {
+      tests.push({
+        name: 'Model Status',
         success: false,
-        message: `Diagnostic failed with error: ${error.message}`,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
+        message: `Error checking model status: ${error.message}`
+      });
     }
+    
+    // Inference test
+    try {
+      const result = await aiService.sendMessage('Hello, this is a test message.');
+      tests.push({
+        name: 'Inference',
+        success: !!result.response,
+        message: result.response ? 'Inference test successful' : 'No response from model'
+      });
+    } catch (error) {
+      tests.push({
+        name: 'Inference',
+        success: false,
+        message: `Error in inference test: ${error.message}`
+      });
+    }
+    
+    // Command execution test
+    try {
+      const result = await aiService.executeCommand('status');
+      tests.push({
+        name: 'Command Execution',
+        success: result.success !== false,
+        message: result.message || 'Command execution test successful'
+      });
+    } catch (error) {
+      tests.push({
+        name: 'Command Execution',
+        success: false,
+        message: `Error in command execution test: ${error.message}`
+      });
+    }
+    
+    // TTS test
+    try {
+      const result = await aiService.textToSpeech('This is a test.');
+      tests.push({
+        name: 'Text-to-Speech',
+        success: !!result.audioUrl,
+        message: result.audioUrl ? 'TTS test successful' : 'No audio URL returned'
+      });
+    } catch (error) {
+      tests.push({
+        name: 'Text-to-Speech',
+        success: false,
+        message: `Error in TTS test: ${error.message}`
+      });
+    }
+    
+    return {
+      timestamp: new Date().toLocaleString(),
+      tests
+    };
+  },
+  
+  /**
+   * Get available integrations
+   */
+  getIntegrations: async () => {
+    return apiRequest('/integrations');
+  },
+  
+  /**
+   * Get Jarvis status
+   */
+  getJarvisStatus: async () => {
+    return apiRequest('/jarvis/status');
+  },
+  
+  /**
+   * Perform an action on Jarvis
+   * @param {string} action - The action to perform: 'initialize', 'start', or 'stop'
+   */
+  jarvisAction: async (action) => {
+    return apiRequest('/jarvis/action', 'POST', { action });
   }
-}
+};
 
-export default new AIService(); 
+export default aiService; 

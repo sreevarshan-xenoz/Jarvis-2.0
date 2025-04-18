@@ -1,123 +1,206 @@
 #!/usr/bin/env python3
 """
-Jarvis Voice Assistant - Core Assistant Module
+Jarvis Assistant - Main Assistant Class
 
-This module contains the main Assistant class that coordinates all functionality.
+This module provides the main JarvisAssistant class that integrates all components
+and provides the core functionality of Jarvis.
 """
 
-from core.speech import SpeechEngine
-from core.command_handler import CommandHandler
-from config.settings import WAKE_WORDS, CONVERSATION_TIMEOUT, CONTINUOUS_MODE
-import time
+import os
+import sys
+import logging
+from typing import Dict, Any, Optional, List
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("jarvis-assistant")
 
 class JarvisAssistant:
     """
-    Main assistant class that coordinates speech recognition,
-    command processing, and response generation.
+    The main Jarvis Assistant class that integrates all components and
+    provides the core functionality of Jarvis.
     """
     
-    def __init__(self, theme_manager=None, profile_manager=None, dataset_manager=None,
-                 display=None, ui_integrator=None, gesture_recognition=None, context_awareness=None):
+    def __init__(
+        self,
+        theme_manager=None,
+        profile_manager=None,
+        dataset_manager=None,
+        display=None,
+        ui_integrator=None,
+        gesture_recognition=None,
+        context_awareness=None
+    ):
         """
-        Initialize the Jarvis assistant with all core components.
-
-        Args:
-            theme_manager: Theme management component
-            profile_manager: User profile management component
-            dataset_manager: Dataset management component
-            display: Display interface component
-            ui_integrator: UI integration component
-            gesture_recognition: Gesture recognition component
-            context_awareness: Context awareness component
-        """
-        self.theme_manager = theme_manager
-        self.profile_manager = profile_manager
-        self.dataset_manager = dataset_manager
-        self.display = display
-        self.ui_integrator = ui_integrator
-        self.gesture_recognition = gesture_recognition
-        self.context_awareness = context_awareness
-
-        self.speech_engine = SpeechEngine()
-        self.command_handler = CommandHandler(self.speech_engine)
-        self.is_active = False
-        self.conversation_active = False
-        self.last_interaction_time = 0
-        
-    def detect_wake_word(self, command):
-        """
-        Check if the command starts with one of the wake words.
+        Initialize the Jarvis Assistant with the required components.
         
         Args:
-            command (str): The command to check
-            
-        Returns:
-            bool: True if a wake word is detected, False otherwise
+            theme_manager: The theme manager component
+            profile_manager: The profile manager component
+            dataset_manager: The dataset manager component
+            display: The display component
+            ui_integrator: The UI integrator component
+            gesture_recognition: The gesture recognition component
+            context_awareness: The context awareness component
         """
-        return any(command.startswith(word) for word in WAKE_WORDS)
+        self._theme_manager = theme_manager
+        self._profile_manager = profile_manager
+        self._dataset_manager = dataset_manager
+        self._display = display
+        self._ui_integrator = ui_integrator
+        self._gesture_recognition = gesture_recognition
+        self._context_awareness = context_awareness
+        
+        self._is_running = False
+        self._last_command = None
+        self._last_response = None
+        
+        logger.info("JarvisAssistant initialized")
     
-    def start(self):
+    def start(self, headless=False):
         """
-        Start the voice assistant and listen for commands.
-        """
-        self.is_active = True
-        self.speech_engine.speak("Jarvis activated. How can I assist you?")
+        Start the Jarvis Assistant.
         
-        while self.is_active:
-            # Check if conversation has timed out
-            if self.conversation_active and time.time() - self.last_interaction_time > CONVERSATION_TIMEOUT:
-                self.conversation_active = False
-                self.speech_engine.display_window.set_animation_state("idle")
+        Args:
+            headless (bool): Whether to run in headless mode
+        """
+        if self._is_running:
+            logger.warning("Jarvis Assistant is already running")
+            return
+        
+        try:
+            logger.info("Starting Jarvis Assistant" + (" (headless)" if headless else ""))
             
-            # Adjust listen timeout based on conversation state
-            listen_timeout = 3 if self.conversation_active else 5
-            command = self.speech_engine.listen(timeout=listen_timeout)
+            # Initialize the display if available
+            if self._display:
+                self._display.initialize(headless=headless)
+                self._display.show_message("Jarvis is starting...")
             
-            if not command:
-                continue
+            # Start other components as needed
+            # ...
             
-            # Process command based on conversation state
-            if self.detect_wake_word(command) or self.conversation_active:
-                # Update conversation state
-                self.conversation_active = True
-                self.last_interaction_time = time.time()
+            self._is_running = True
+            
+            if self._display:
+                self._display.show_message("Jarvis is ready")
                 
-                # Set animation state to conversation active
-                self.speech_engine.display_window.set_animation_state("conversation")
-                
-                # Extract the actual command after the wake word if needed
-                if self.detect_wake_word(command) and not CONTINUOUS_MODE:
-                    actual_command = command.split(' ', 1)[1] if ' ' in command else ""
-                else:
-                    actual_command = command
-                
-                if actual_command:
-                    # Set animation state to speaking before processing command
-                    self.speech_engine.display_window.set_animation_state("speaking")
-                    result = self.command_handler.process_command(actual_command)
-                    # Check if the command handler returned a stop signal
-                    if result is False:
-                        self.is_active = False
-                        break
-                    # Keep conversation active after command processing
-                    self.last_interaction_time = time.time()
-                else:
-                    self.speech_engine.speak("Yes? I'm listening...")
-                    follow_up_command = self.speech_engine.listen()
-                    if follow_up_command:
-                        result = self.command_handler.process_command(follow_up_command)
-                        # Check if the command handler returned a stop signal
-                        if result is False:
-                            self.is_active = False
-                            break
-                        # Keep conversation active after command processing
-                        self.last_interaction_time = time.time()
+            logger.info("Jarvis Assistant started")
+            
+        except Exception as e:
+            logger.error(f"Error starting Jarvis Assistant: {str(e)}")
+            self.stop()
+            raise
     
     def stop(self):
+        """Stop the Jarvis Assistant."""
+        if not self._is_running:
+            logger.warning("Jarvis Assistant is not running")
+            return
+        
+        try:
+            logger.info("Stopping Jarvis Assistant")
+            
+            # Stop other components as needed
+            # ...
+            
+            # Stop the display if available
+            if self._display:
+                self._display.show_message("Jarvis is shutting down...")
+                self._display.stop()
+            
+            self._is_running = False
+            
+            logger.info("Jarvis Assistant stopped")
+            
+        except Exception as e:
+            logger.error(f"Error stopping Jarvis Assistant: {str(e)}")
+            self._is_running = False
+            raise
+    
+    def process_command(self, command: str, web_mode=False) -> Dict[str, Any]:
         """
-        Stop the voice assistant.
+        Process a command and return the result.
+        
+        Args:
+            command (str): The command to process
+            web_mode (bool): Whether the command is coming from the web interface
+            
+        Returns:
+            Dict[str, Any]: The result of processing the command
         """
-        self.is_active = False
-        self.speech_engine.speak("Goodbye!")
-        # Stop the display window
-        self.speech_engine.display_window.stop()
+        if not self._is_running:
+            logger.warning("Jarvis Assistant is not running, can't process command")
+            return {
+                "success": False,
+                "response": "Jarvis is not running. Please start Jarvis first.",
+                "data": {}
+            }
+        
+        try:
+            logger.info(f"Processing command: {command}" + (" (web mode)" if web_mode else ""))
+            
+            self._last_command = command
+            
+            # Log the command to display if available and not in web mode
+            if self._display and not web_mode:
+                self._display.show_message(f"Command: {command}")
+            
+            # Process the command based on type/pattern
+            if command.lower().startswith("hello") or command.lower().startswith("hi"):
+                response = "Hello! I am Jarvis, your personal assistant. How can I help you today?"
+            elif command.lower() == "status":
+                response = "I'm operational and running normally. All systems are functioning properly."
+            elif command.lower().startswith("time"):
+                import datetime
+                now = datetime.datetime.now()
+                response = f"The current time is {now.strftime('%H:%M:%S')}."
+            elif command.lower().startswith("date"):
+                import datetime
+                now = datetime.datetime.now()
+                response = f"Today's date is {now.strftime('%A, %B %d, %Y')}."
+            elif command.lower().startswith("weather"):
+                response = "I'm sorry, weather functionality is not implemented yet."
+            else:
+                response = f"I received your command: '{command}'. However, I don't have specific functionality for that yet."
+            
+            self._last_response = response
+            
+            # Show the response in the display if available and not in web mode
+            if self._display and not web_mode:
+                self._display.show_message(f"Jarvis: {response}")
+            
+            logger.info(f"Processed command: {command}")
+            
+            return {
+                "success": True,
+                "response": response,
+                "data": {
+                    "command": command,
+                    "timestamp": import_time().strftime('%Y-%m-%d %H:%M:%S')
+                }
+            }
+            
+        except Exception as e:
+            error_msg = f"Error processing command: {str(e)}"
+            logger.error(error_msg)
+            
+            if self._display and not web_mode:
+                self._display.show_message(f"Error: {error_msg}")
+            
+            return {
+                "success": False,
+                "response": error_msg,
+                "data": {
+                    "command": command,
+                    "error": str(e)
+                }
+            }
+
+# Helper function to import time module on demand
+def import_time():
+    """Import time module and return it."""
+    import datetime
+    return datetime.datetime.now()
