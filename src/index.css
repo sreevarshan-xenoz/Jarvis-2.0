@@ -56,15 +56,25 @@ canvas:focus {
   z-index: 1 !important;
 }
 
-/* Hide Spline attribution */
+/* Aggressive Spline watermark removal */
+.spline-watermark,
 [data-spline-uia="canvas-attribution"],
 [class*="spline-watermark"],
-.spline-watermark,
 div[style*="position: absolute; right: 10px; bottom: 10px;"],
 div[style*="position:absolute;right:10px;bottom:10px;"],
-.spline-viewer > div:last-child {
+.spline-viewer > div:last-child,
+#_branding,
+#_canvas-branding,
+._canvas-branding,
+[class*="_branding"],
+a[href*="spline.design"]{
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  transform: scale(0) !important;
   pointer-events: none !important;
+  z-index: -9999 !important;
 } 

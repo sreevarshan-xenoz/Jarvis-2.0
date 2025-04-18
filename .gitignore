@@ -58,4 +58,21 @@ ollama_data/
 *.dll
 *.exe
 *.out
-*.app 
+*.app
+
+# API Keys and Secrets
+.env
+.flaskenv
+*.pem
+*.key
+ngrok.yml
+.ngrok2/
+
+# Secret configuration files
+*.config.js
+config.js
+config.json
+secrets.json
+
+# Ngrok specific files
+.ngrok/ 

@@ -20,8 +20,9 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 from ctypes import cast, POINTER
-from comtypes import CLSCTX
-from comtypes.win32 import AudioUtilities, IAudioEndpointVolume
+from comtypes import CLSCTX_ALL
+# Comment out problematic import and add alternative implementation
+# from comtypes.win32 import AudioUtilities, IAudioEndpointVolume
 import re
 
 # Load environment variables
@@ -174,59 +175,80 @@ def open_website(url: str) -> str:
         logger.error(f"Error opening website: {str(e)}")
         return f"Error opening website: {str(e)}"
 
-def control_volume(command: str) -> str:
-    """Control system volume"""
-    try:
-        # Parse the command
+# Define volume control alternatives based on platform
+def get_volume_control():
+    """Create platform-specific volume control functionality"""
+    system = platform.system()
+    
+    if system == "Windows":
+        try:
+            # Try to import Windows-specific modules
+            from comtypes import CLSCTX_ALL
+            import pythoncom
+            import pycaw.pycaw as pycaw
+            
+            def control_volume_windows(command):
+                pythoncom.CoInitialize()
+                devices = pycaw.AudioUtilities.GetSpeakers()
+                interface = devices.Activate(pycaw.IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+                volume = cast(interface, POINTER(pycaw.IAudioEndpointVolume))
+                
+                if "mute" in command.lower():
+                    volume.SetMute(1, None)
+                    return "System volume muted"
+                elif "unmute" in command.lower():
+                    volume.SetMute(0, None)
+                    return "System volume unmuted"
+                elif "up" in command.lower() or "increase" in command.lower():
+                    current_volume = volume.GetMasterVolumeLevelScalar()
+                    new_volume = min(1.0, current_volume + 0.1)
+                    volume.SetMasterVolumeLevelScalar(new_volume, None)
+                    return f"Volume increased to {int(new_volume * 100)}%"
+                elif "down" in command.lower() or "decrease" in command.lower():
+                    current_volume = volume.GetMasterVolumeLevelScalar()
+                    new_volume = max(0.0, current_volume - 0.1)
+                    volume.SetMasterVolumeLevelScalar(new_volume, None)
+                    return f"Volume decreased to {int(new_volume * 100)}%"
+                elif "set" in command.lower():
+                    match = re.search(r'(\d+)', command)
+                    if match:
+                        percent = min(100, max(0, int(match.group(1))))
+                        volume.SetMasterVolumeLevelScalar(percent / 100.0, None)
+                        return f"Volume set to {percent}%"
+                    else:
+                        return "Could not extract volume percentage from command"
+                else:
+                    return "Unknown volume command. Use 'mute', 'unmute', 'up', 'down', or 'set X%'"
+            
+            return control_volume_windows
+            
+        except ImportError:
+            logger.warning("Windows volume control libraries not available, using mock implementation")
+    
+    # For non-Windows systems or if Windows libraries failed to import
+    def control_volume_mock(command):
         if "mute" in command.lower():
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            volume.SetMute(1, None)
-            return "System volume muted"
-            
+            return "System volume muted (mock)"
         elif "unmute" in command.lower():
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            volume.SetMute(0, None)
-            return "System volume unmuted"
-            
+            return "System volume unmuted (mock)"
         elif "up" in command.lower() or "increase" in command.lower():
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            current_volume = volume.GetMasterVolumeLevelScalar()
-            new_volume = min(1.0, current_volume + 0.1)
-            volume.SetMasterVolumeLevelScalar(new_volume, None)
-            return f"Volume increased to {int(new_volume * 100)}%"
-            
+            return "Volume increased (mock)"
         elif "down" in command.lower() or "decrease" in command.lower():
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            current_volume = volume.GetMasterVolumeLevelScalar()
-            new_volume = max(0.0, current_volume - 0.1)
-            volume.SetMasterVolumeLevelScalar(new_volume, None)
-            return f"Volume decreased to {int(new_volume * 100)}%"
-            
+            return "Volume decreased (mock)"
         elif "set" in command.lower():
-            # Extract percentage value from command
             match = re.search(r'(\d+)', command)
             if match:
                 percent = min(100, max(0, int(match.group(1))))
-                devices = AudioUtilities.GetSpeakers()
-                interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-                volume = cast(interface, POINTER(IAudioEndpointVolume))
-                volume.SetMasterVolumeLevelScalar(percent / 100.0, None)
-                return f"Volume set to {percent}%"
+                return f"Volume set to {percent}% (mock)"
             else:
                 return "Could not extract volume percentage from command"
         else:
             return "Unknown volume command. Use 'mute', 'unmute', 'up', 'down', or 'set X%'"
-    except Exception as e:
-        logger.error(f"Error controlling volume: {str(e)}")
-        return f"Error controlling volume: {str(e)}"
+    
+    return control_volume_mock
+
+# Set the volume control function based on platform
+control_volume = get_volume_control()
 
 def execute_command(command: str) -> Dict[str, Any]:
     """Execute a command and return the result"""
@@ -416,5 +438,25 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     logger.info(f"Starting AURA API server on port {port}")
     logger.info(f"Using Gemini API with key: {GEMINI_API_KEY[:5]}...")
+    
+    # Set up ngrok tunnel
+    try:
+        from pyngrok import ngrok, conf
+        # Set up auth token if provided
+        ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "2vuDgkjBttqOoLWBXiPKZg2VfBd_3iNs6ZiMPfL9pHgNmGKFo")
+        conf.get_default().auth_token = ngrok_auth_token
+        
+        # Start ngrok tunnel
+        # Use the simplest connect method
+        public_url = ngrok.connect(port).public_url
+        logger.info(f"AURA API Server accessible via ngrok tunnel: {public_url}")
+        logger.info(f"Use these URLs in your Supabase environment variables:")
+        logger.info(f"GEMINI_API_URL: {public_url}/chat")
+        logger.info(f"COMMAND_API_URL: {public_url}/execute")
+        logger.info(f"STATUS_API_URL: {public_url}/status")
+        logger.info(f"TTS_API_URL: {public_url}/tts")
+    except Exception as e:
+        logger.error(f"Failed to create ngrok tunnel: {str(e)}")
+        logger.info("Continuing without ngrok tunnel...")
     
     uvicorn.run("api_server:app", host="0.0.0.0", port=port, reload=True) 
