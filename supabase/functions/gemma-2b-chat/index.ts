@@ -1,9 +1,9 @@
-// Follow this setup guide to integrate the Supabase Edge Functions with your Gemma 2B model:
+// Follow this setup guide to integrate the Supabase Edge Functions with your API server:
 // https://supabase.com/docs/guides/functions
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-console.log('Gemma 2B Chat Function started')
+console.log('Gemini API Chat Function started')
 
 interface RequestBody {
   message: string
@@ -21,15 +21,15 @@ serve(async (req) => {
       )
     }
 
-    // Call your Python backend hosting the Gemma 2B model
-    const apiUrl = Deno.env.get('GEMMA_API_URL') || 'http://localhost:8000/chat'
-    const apiKey = Deno.env.get('GEMMA_API_KEY') || ''
+    // Call your API server that connects to Gemini
+    const apiUrl = Deno.env.get('GEMINI_API_URL') || 'http://localhost:8000/chat'
+    const apiKey = Deno.env.get('GEMINI_API_KEY') || ''
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': apiKey ? `Bearer ${apiKey}` : ''
       },
       body: JSON.stringify({ message })
     })
@@ -44,20 +44,20 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         response: data.response || 'No response from model',
-        model: data.model || 'Gemma 2B'
+        model: data.model || 'Gemini Pro'
       }),
       { headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error('Error in Gemma 2B Chat function:', error)
+    console.error('Error in Gemini Chat function:', error)
     
     // For development/testing, return mock data if the real API fails
     if (Deno.env.get('ENVIRONMENT') === 'development') {
       console.log('Development environment detected, returning mock response')
       return new Response(
         JSON.stringify({ 
-          response: "This is a mock response from the Gemma 2B model for development purposes. Your actual model connection isn't working yet.", 
-          model: "Gemma 2B (Mock)"
+          response: "This is a mock response from Gemini for development purposes. Your actual model connection isn't working yet.", 
+          model: "Gemini Pro (Mock)"
         }),
         { headers: { 'Content-Type': 'application/json' } }
       )
@@ -66,7 +66,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Internal server error',
-        details: 'Failed to process message with Gemma 2B model'
+        details: 'Failed to process message with Gemini model'
       }),
       { headers: { 'Content-Type': 'application/json' }, status: 500 }
     )

@@ -287,6 +287,7 @@ function App() {
             scene="https://prod.spline.design/qX39OiHwKkpiLOPh/scene.splinecode" 
             onLoad={onLoadBackground}
             style={{ width: '100%', height: '100%' }}
+            hideAttribution={true}
           />
         </SplineBackgroundContainer>
         
@@ -296,6 +297,7 @@ function App() {
             scene="https://prod.spline.design/q2c5wAVesDdTQQ8A/scene.splinecode" 
             onLoad={onLoadForeground}
             style={{ width: '100%', height: '100%' }}
+            hideAttribution={true}
           />
         </SplineForegroundContainer>
         

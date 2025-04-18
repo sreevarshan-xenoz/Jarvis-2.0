@@ -1,4 +1,4 @@
-// Follow this setup guide to integrate the Supabase Edge Functions with your Python backend:
+// Follow this setup guide to integrate the Supabase Edge Functions with your API server:
 // https://supabase.com/docs/guides/functions
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -21,15 +21,15 @@ serve(async (req) => {
       )
     }
 
-    // Call your Python backend to execute the command
+    // Call your API server to execute the command
     const apiUrl = Deno.env.get('COMMAND_API_URL') || 'http://localhost:8000/execute'
-    const apiKey = Deno.env.get('COMMAND_API_KEY') || ''
+    const apiKey = Deno.env.get('GEMINI_API_KEY') || ''
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': apiKey ? `Bearer ${apiKey}` : ''
       },
       body: JSON.stringify({ command })
     })
@@ -42,11 +42,7 @@ serve(async (req) => {
     const data = await response.json()
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: data.message || 'Command executed successfully',
-        result: data.result || null 
-      }),
+      JSON.stringify(data),
       { headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {

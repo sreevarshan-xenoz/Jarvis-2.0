@@ -54,4 +54,9 @@ canvas:focus {
 /* Fix z-index */
 .spline-container {
   z-index: 1 !important;
+}
+
+/* Hide Spline attribution */
+[data-spline-uia="canvas-attribution"] {
+  display: none !important;
 } 

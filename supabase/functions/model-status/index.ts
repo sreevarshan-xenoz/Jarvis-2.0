@@ -1,4 +1,4 @@
-// Follow this setup guide to integrate the Supabase Edge Functions with your Python backend:
+// Follow this setup guide to integrate the Supabase Edge Functions with your API server:
 // https://supabase.com/docs/guides/functions
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -7,15 +7,15 @@ console.log('Model Status function started')
 
 serve(async (req) => {
   try {
-    // Call your Python backend to check model status
+    // Call your API server to check model status
     const apiUrl = Deno.env.get('STATUS_API_URL') || 'http://localhost:8000/status'
-    const apiKey = Deno.env.get('STATUS_API_KEY') || ''
+    const apiKey = Deno.env.get('GEMINI_API_KEY') || ''
 
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': apiKey ? `Bearer ${apiKey}` : ''
       }
     })
 
@@ -29,7 +29,7 @@ serve(async (req) => {
       JSON.stringify({ 
         online: data.online || false,
         status: data.status || 'Unknown status',
-        model: data.model || 'Gemma 2B',
+        model: data.model || 'Gemini Pro',
         memory_usage: data.memory_usage || null,
         load: data.load || null
       }),
