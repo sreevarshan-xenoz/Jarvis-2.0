@@ -205,6 +205,17 @@ const DiagnosticIcon = styled.span`
     isOnline ? 'rgba(66, 220, 219, 0.6)' : 'rgba(255, 87, 87, 0.6)'};
 `;
 
+const WatermarkCover = styled.div`
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 200px;
+  height: 60px;
+  background: #000;
+  z-index: 9999;
+  pointer-events: none;
+`;
+
 function App() {
   const [command, setCommand] = useState('');
   const [modelStatus, setModelStatus] = useState({ online: false, status: 'Checking model status...' });
@@ -280,6 +291,10 @@ function App() {
     <ThemeProvider theme={darkTheme}>
       <AppContainer>
         <NeonGlow />
+        <WatermarkCover />
+        <WatermarkCover style={{ bottom: '10px', right: '10px' }} />
+        <WatermarkCover style={{ bottom: '10px', right: '0' }} />
+        <WatermarkCover style={{ bottom: '0', right: '10px' }} />
         
         {/* The newer 3D scene forms the solid background */}
         <SplineBackgroundContainer>
