@@ -5,7 +5,7 @@ import Spline from '@splinetool/react-spline';
 import ChatInterface from './components/ChatInterface';
 import Header from './components/Header';
 import DiagnosticPanel from './components/DiagnosticPanel';
-import JarvisIntegration from './components/JarvisIntegration';
+import AuraIntegration from './components/AuraIntegration';
 import aiService from './services/aiService';
 
 const AppContainer = styled.div`
@@ -246,7 +246,7 @@ const App = () => {
   const [modelStatus, setModelStatus] = useState({ online: false, status: 'Checking status...' });
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [notification, setNotification] = useState(null);
-  const [useJarvis, setUseJarvis] = useState(false);
+  const [useAura, setUseAura] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const backgroundSplineRef = useRef();
@@ -338,7 +338,7 @@ const App = () => {
         const cmdText = userInput.substring(1); // Remove the slash
         showNotification('Executing command...');
         
-        const result = await aiService.executeCommand(cmdText, useJarvis);
+        const result = await aiService.executeCommand(cmdText, useAura);
         
         // Add command result to chat
         const responseMessage = {
@@ -462,10 +462,10 @@ const App = () => {
     showNotification("Chat history cleared");
   };
 
-  // Handle Jarvis toggle
-  const handleUseJarvisChange = (value) => {
-    setUseJarvis(value);
-    showNotification(value ? 'Switched to Jarvis' : 'Switched to AURA AI');
+  // Handle AURA toggle
+  const handleUseAuraChange = (value) => {
+    setUseAura(value);
+    showNotification(value ? 'Using AURA Core AI' : 'Using Cloud AI');
   };
 
   // Toggle voice mode
@@ -491,7 +491,7 @@ const App = () => {
         <WatermarkCover style={{ bottom: '10px', right: '0' }} />
         <WatermarkCover style={{ bottom: '0', right: '10px' }} />
         
-        <JarvisIntegration onUseJarvisChange={handleUseJarvisChange} />
+        <AuraIntegration onUseAuraChange={handleUseAuraChange} />
         
         <motion.button
           style={{

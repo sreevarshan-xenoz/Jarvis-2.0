@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Jarvis Bridge - Connect Jarvis core functionality to AURA web interface
+AURA Core Bridge - Connect AURA core functionality to web interface
 
-This module provides a bridge between the Jarvis core system and the AURA API server,
-allowing the web interface to access Jarvis functionality.
+This module provides a bridge between the AURA core system and the API server,
+allowing the web interface to access AURA AI functionality.
 """
 
 import os
@@ -19,15 +19,15 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger("jarvis-bridge")
+logger = logging.getLogger("aura-bridge")
 
-# Add the core Jarvis directory to Python path if needed
-jarvis_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'jarvis'))
-if jarvis_path not in sys.path:
-    sys.path.insert(0, jarvis_path)
+# Add the core directory to Python path if needed
+aura_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'jarvis'))
+if aura_path not in sys.path:
+    sys.path.insert(0, aura_path)
 
-class JarvisBridge:
-    """Bridge between Jarvis core system and the AURA web interface"""
+class AuraBridge:
+    """Bridge between AURA core system and the web interface"""
     
     def __init__(self):
         self._assistant = None
@@ -41,14 +41,14 @@ class JarvisBridge:
         self._is_running = False
         
     def initialize(self) -> bool:
-        """Initialize the Jarvis core components"""
+        """Initialize the AURA core components"""
         with self._lock:
             if self._initialized:
                 return True
                 
             try:
-                # Import the required Jarvis modules
-                logger.info("Importing Jarvis core modules...")
+                # Import the required core modules
+                logger.info("Importing AURA core modules...")
                 from core.assistant import JarvisAssistant
                 from core.theme_manager import ThemeManager
                 from core.user_profiles import ProfileManager
@@ -56,21 +56,21 @@ class JarvisBridge:
                 from core.display_factory import create_display
                 
                 # Initialize core components
-                logger.info("Initializing Jarvis theme manager...")
+                logger.info("Initializing AURA theme manager...")
                 self._theme_manager = ThemeManager()
                 
-                logger.info("Initializing Jarvis profile manager...")
+                logger.info("Initializing AURA profile manager...")
                 self._profile_manager = ProfileManager()
                 
-                logger.info("Initializing Jarvis dataset manager...")
+                logger.info("Initializing AURA dataset manager...")
                 self._dataset_manager = DatasetManager()
                 
                 # Use headless display for web integration
-                logger.info("Initializing Jarvis display (headless)...")
+                logger.info("Initializing AURA display (headless)...")
                 self._display = create_display(use_animated=False, headless=True)
                 
                 # Initialize the main assistant
-                logger.info("Initializing Jarvis assistant...")
+                logger.info("Initializing AURA assistant...")
                 self._assistant = JarvisAssistant(
                     theme_manager=self._theme_manager,
                     profile_manager=self._profile_manager,
@@ -82,18 +82,18 @@ class JarvisBridge:
                 )
                 
                 self._initialized = True
-                logger.info("Jarvis bridge initialization complete")
+                logger.info("AURA bridge initialization complete")
                 return True
                 
             except ImportError as e:
-                logger.error(f"Failed to import Jarvis modules: {str(e)}")
+                logger.error(f"Failed to import AURA modules: {str(e)}")
                 return False
             except Exception as e:
-                logger.error(f"Failed to initialize Jarvis: {str(e)}")
+                logger.error(f"Failed to initialize AURA: {str(e)}")
                 return False
     
     def start(self) -> bool:
-        """Start the Jarvis assistant in a separate thread"""
+        """Start the AURA assistant in a separate thread"""
         if not self._initialized and not self.initialize():
             return False
             
@@ -110,7 +110,7 @@ class JarvisBridge:
             self._is_running = True
             return True
         except Exception as e:
-            logger.error(f"Failed to start Jarvis: {str(e)}")
+            logger.error(f"Failed to start AURA: {str(e)}")
             return False
     
     def _start_assistant_thread(self):
@@ -120,11 +120,11 @@ class JarvisBridge:
                 # Override standard input/output for web integration
                 self._assistant.start(headless=True)
         except Exception as e:
-            logger.error(f"Error in Jarvis thread: {str(e)}")
+            logger.error(f"Error in AURA thread: {str(e)}")
             self._is_running = False
     
     def stop(self) -> bool:
-        """Stop the Jarvis assistant"""
+        """Stop the AURA assistant"""
         if not self._initialized or not self._is_running:
             return True
             
@@ -134,22 +134,22 @@ class JarvisBridge:
             self._is_running = False
             return True
         except Exception as e:
-            logger.error(f"Failed to stop Jarvis: {str(e)}")
+            logger.error(f"Failed to stop AURA: {str(e)}")
             return False
     
     def process_command(self, command: str) -> Dict[str, Any]:
-        """Process a command through the Jarvis assistant"""
+        """Process a command through the AURA assistant"""
         if not self._initialized and not self.initialize():
             return {
                 "success": False,
-                "message": "Jarvis is not initialized",
+                "message": "AURA is not initialized",
                 "command": command
             }
             
         if not self._is_running and not self.start():
             return {
                 "success": False,
-                "message": "Jarvis is not running",
+                "message": "AURA is not running",
                 "command": command
             }
             
@@ -159,7 +159,7 @@ class JarvisBridge:
                 # Clear any previous response
                 self._last_response = ""
                 
-                # Process command through Jarvis
+                # Process command through AURA
                 result = self._assistant.process_command(command, web_mode=True)
                 
                 # Store the response
@@ -174,7 +174,7 @@ class JarvisBridge:
             else:
                 return {
                     "success": False,
-                    "message": "Jarvis assistant is not available",
+                    "message": "AURA assistant is not available",
                     "command": command
                 }
         except Exception as e:
@@ -186,7 +186,7 @@ class JarvisBridge:
             }
     
     def get_status(self) -> Dict[str, Any]:
-        """Get the current status of the Jarvis system"""
+        """Get the current status of the AURA system"""
         return {
             "initialized": self._initialized,
             "running": self._is_running,
@@ -200,25 +200,24 @@ class JarvisBridge:
         }
 
 # Create a singleton instance
-jarvis_bridge = JarvisBridge()
+aura_bridge = AuraBridge()
 
-# Helper functions for API integration
-def initialize_jarvis() -> bool:
-    """Initialize the Jarvis bridge"""
-    return jarvis_bridge.initialize()
-
-def start_jarvis() -> bool:
-    """Start the Jarvis assistant"""
-    return jarvis_bridge.start()
-
-def stop_jarvis() -> bool:
-    """Stop the Jarvis assistant"""
-    return jarvis_bridge.stop()
-
-def process_jarvis_command(command: str) -> Dict[str, Any]:
-    """Process a command through Jarvis"""
-    return jarvis_bridge.process_command(command)
-
-def get_jarvis_status() -> Dict[str, Any]:
-    """Get Jarvis system status"""
-    return jarvis_bridge.get_status() 
+def initialize_aura() -> bool:
+    """Initialize the AURA core system"""
+    return aura_bridge.initialize()
+    
+def start_aura() -> bool:
+    """Start the AURA assistant"""
+    return aura_bridge.start()
+    
+def stop_aura() -> bool:
+    """Stop the AURA assistant"""
+    return aura_bridge.stop()
+    
+def process_aura_command(command: str) -> Dict[str, Any]:
+    """Process a command through the AURA assistant"""
+    return aura_bridge.process_command(command)
+    
+def get_aura_status() -> Dict[str, Any]:
+    """Get the current status of the AURA system"""
+    return aura_bridge.get_status() 

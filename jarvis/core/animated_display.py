@@ -12,8 +12,27 @@ import queue
 import math
 import random
 import time
-from PIL import Image, ImageTk, ImageDraw
-import numpy as np
+import logging
+import sys
+
+# Set up logger
+logger = logging.getLogger("animated-display")
+
+# Try to import optional dependencies with graceful fallback
+try:
+    from PIL import Image, ImageTk, ImageDraw
+    PIL_AVAILABLE = True
+except ImportError:
+    logger.warning("PIL/Pillow not installed. Falling back to basic animations.")
+    PIL_AVAILABLE = False
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    logger.warning("NumPy not installed. Falling back to basic animations.")
+    NUMPY_AVAILABLE = False
+
 from tkinter import ttk
 
 class AnimatedDisplayWindow:
@@ -108,6 +127,11 @@ class AnimatedDisplayWindow:
             "text": "#ecf0f1",
             "text_dim": "#bdc3c7"
         }
+        
+        # Flag to use simpler animations if dependencies are missing
+        self.use_simple_animation = not (PIL_AVAILABLE and NUMPY_AVAILABLE)
+        if self.use_simple_animation:
+            logger.info("Using simplified animations due to missing dependencies")
     
     def _create_window(self):
         """
@@ -201,6 +225,54 @@ class AnimatedDisplayWindow:
             self.base_radius = 60  # Increased from 45 to 60
             self.pulse_phase = 0
             
+            if self.use_simple_animation:
+                # Simple animation for systems without PIL/NumPy
+                self.core = self.canvas.create_oval(
+                    center_x - self.base_radius * 0.2, center_y - self.base_radius * 0.2,
+                    center_x + self.base_radius * 0.2, center_y + self.base_radius * 0.2,
+                    outline="",
+                    fill=self.state_properties["idle"]["color"]
+                )
+                
+                self.center_circle = self.canvas.create_oval(
+                    center_x - self.base_radius, center_y - self.base_radius,
+                    center_x + self.base_radius, center_y + self.base_radius,
+                    outline=self.state_properties["idle"]["color"],
+                    width=2.5,
+                    fill=""
+                )
+                
+                # Set default attributes to avoid AttributeError
+                self.core_glow = self.canvas.create_oval(
+                    center_x - self.base_radius * 0.3, center_y - self.base_radius * 0.3,
+                    center_x + self.base_radius * 0.3, center_y + self.base_radius * 0.3,
+                    outline="",
+                    fill=self.state_properties["idle"]["color"],
+                    stipple="gray50"
+                )
+                
+                self.inner_glow = self.canvas.create_oval(
+                    center_x - self.base_radius + 10, center_y - self.base_radius + 10,
+                    center_x + self.base_radius - 10, center_y + self.base_radius - 10,
+                    outline=self.state_properties["idle"]["color"],
+                    width=1.5,
+                    fill=""
+                )
+                
+                self.outer_glow = self.canvas.create_oval(
+                    center_x - self.base_radius - 15, center_y - self.base_radius - 15,
+                    center_x + self.base_radius + 15, center_y + self.base_radius + 15,
+                    outline=self.state_properties["idle"]["color"],
+                    width=1,
+                    fill=""
+                )
+                
+                # Skip complex particle system
+                self.particles = []
+                
+                logger.info("Simple animation initialized successfully")
+                return
+            
             # Core glow (new)
             self.core_glow = self.canvas.create_oval(
                 center_x - self.base_radius * 0.3, center_y - self.base_radius * 0.3,
@@ -245,8 +317,42 @@ class AnimatedDisplayWindow:
                 fill=""
             )
             
+            logger.info("Advanced animation initialized successfully")
+            
         except Exception as e:
-            print(f"Error initializing animation: {e}")
+            logger.error(f"Error initializing animation: {e}")
+            # Fall back to extremely simple display if initialization fails
+            try:
+                # Clear all existing objects
+                self.canvas.delete("all")
+                
+                # Create a simple status circle
+                center_x = self.canvas_width / 2
+                center_y = self.canvas_height / 2
+                self.base_radius = 40
+                
+                self.core = self.canvas.create_oval(
+                    center_x - self.base_radius, center_y - self.base_radius,
+                    center_x + self.base_radius, center_y + self.base_radius,
+                    outline=self.state_properties["idle"]["color"],
+                    width=2,
+                    fill=""
+                )
+                
+                # Set all required attributes to avoid AttributeError
+                self.center_circle = self.core
+                self.core_glow = self.core
+                self.inner_glow = self.core
+                self.outer_glow = self.core
+                
+                # Skip complex animations
+                self.particles = []
+                self.use_simple_animation = True
+                
+                logger.info("Fallback animation initialized successfully")
+            except Exception as fallback_error:
+                logger.critical(f"Critical error in fallback animation: {fallback_error}")
+                # At this point, just let the display run without animations
     
     def _animate(self):
         """
@@ -267,6 +373,37 @@ class AnimatedDisplayWindow:
             elif self.animation_intensity > target_intensity:
                 self.animation_intensity = max(target_intensity, self.animation_intensity - self.animation_fade_speed)
             
+            # Calculate orb dimensions
+            center_x = self.canvas_width / 2
+            center_y = self.canvas_height / 2
+            
+            # Simplified animation for systems without PIL/NumPy
+            if self.use_simple_animation:
+                self.pulse_phase += state_props["pulse_speed"] * 2
+                pulse_scale = 1 + math.sin(self.pulse_phase) * 0.1 * self.animation_intensity
+                current_radius = self.base_radius * pulse_scale
+                
+                # Simple pulsing circle
+                self.canvas.coords(self.center_circle,
+                    center_x - current_radius, center_y - current_radius,
+                    center_x + current_radius, center_y + current_radius)
+                
+                # Update colors
+                self.canvas.itemconfig(self.center_circle, outline=state_props["color"])
+                
+                # If we have a core, update it
+                if hasattr(self, "core") and self.core:
+                    core_radius = current_radius * 0.4
+                    self.canvas.coords(self.core,
+                        center_x - core_radius, center_y - core_radius,
+                        center_x + core_radius, center_y + core_radius)
+                    self.canvas.itemconfig(self.core, fill=state_props["color"])
+                
+                # Schedule next frame
+                self.root.after(30, self._animate)
+                return
+            
+            # Advanced animation with full effects
             # Update pulse and breathing effects
             self.pulse_phase += state_props["pulse_speed"]
             self.breathing_phase += self.breathing_speed
@@ -274,9 +411,6 @@ class AnimatedDisplayWindow:
             breathing_scale = 1 + math.sin(self.breathing_phase) * 0.15 * self.animation_intensity
             combined_scale = pulse_scale * breathing_scale
             
-            # Calculate orb dimensions
-            center_x = self.canvas_width / 2
-            center_y = self.canvas_height / 2
             current_radius = self.base_radius * combined_scale
             
             # Update core with pulsing effect
@@ -438,14 +572,10 @@ class AnimatedDisplayWindow:
             
             self.particles = new_particles
             
-            # Update circle glow
-            if hasattr(self, "center_circle") and hasattr(self, "glow_circle"):
-                glow_color = self.color_scheme[self.state_properties[self.animation_state]["color"]]
-                self.canvas.itemconfig(self.center_circle, outline=glow_color)
-                self.canvas.itemconfig(self.glow_circle, outline=glow_color)
-            
         except Exception as e:
-            print(f"Error in animation: {e}")
+            logger.error(f"Error in animation: {e}")
+            # If animation fails, switch to simple mode
+            self.use_simple_animation = True
         
         # Schedule next frame
         self.root.after(30, self._animate)
@@ -482,19 +612,37 @@ class AnimatedDisplayWindow:
         self.text_area.config(state=tk.DISABLED)
     
     def _adjust_color_brightness(self, color, factor):
-        """Adjust the brightness of a color."""
-        # Remove the '#' and convert to RGB
-        r = int(color[1:3], 16)
-        g = int(color[3:5], 16)
-        b = int(color[5:7], 16)
+        """
+        Adjust the brightness of a hex color.
         
-        # Adjust brightness
-        r = min(255, max(0, int(r * factor)))
-        g = min(255, max(0, int(g * factor)))
-        b = min(255, max(0, int(b * factor)))
-        
-        # Convert back to hex
-        return f"#{r:02x}{g:02x}{b:02x}"
+        Args:
+            color (str): Hex color string (e.g., "#3498db")
+            factor (float): Brightness factor (>1 for brighter, <1 for darker)
+            
+        Returns:
+            str: Adjusted hex color
+        """
+        try:
+            # Parse hex color
+            if color.startswith("#"):
+                color = color[1:]
+                
+            # Convert to RGB
+            r = int(color[0:2], 16)
+            g = int(color[2:4], 16)
+            b = int(color[4:6], 16)
+            
+            # Adjust brightness
+            r = min(255, max(0, int(r * factor)))
+            g = min(255, max(0, int(g * factor)))
+            b = min(255, max(0, int(b * factor)))
+            
+            # Convert back to hex
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except Exception as e:
+            logger.error(f"Error adjusting color brightness: {e}")
+            # Return original color if there's an error
+            return color if isinstance(color, str) else "#3498db"  # Default blue if all else fails
     
     def set_animation_state(self, state):
         """

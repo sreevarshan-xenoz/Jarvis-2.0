@@ -9,6 +9,8 @@ comtypes>=1.2.0  # Required by pyttsx3 on Windows
 
 # GUI (tkinter is included in standard Python library)
 # No additional installation required for tkinter
+Pillow>=10.0.0  # Required for animated GUI display
+numpy>=1.24.0  # Required for animated effects
 
 # Web and API interactions
 requests>=2.31.0

@@ -56,12 +56,12 @@ const aiService = {
   /**
    * Execute a command
    * @param {string} command - The command to execute
-   * @param {boolean} useJarvis - Whether to route the command through Jarvis
+   * @param {boolean} useAura - Whether to route the command through AURA Core
    */
-  executeCommand: async (command, useJarvis = false) => {
+  executeCommand: async (command, useAura = false) => {
     return apiRequest('/execute', 'POST', { 
       command,
-      use_jarvis: useJarvis
+      use_jarvis: useAura  // Keep the API parameter name for backward compatibility
     });
   },
   
@@ -165,18 +165,18 @@ const aiService = {
   },
   
   /**
-   * Get Jarvis status
+   * Get AURA Core status
    */
-  getJarvisStatus: async () => {
-    return apiRequest('/jarvis/status');
+  getAuraStatus: async () => {
+    return apiRequest('/aura/status');
   },
   
   /**
-   * Perform an action on Jarvis
+   * Perform an action on AURA Core
    * @param {string} action - The action to perform: 'initialize', 'start', or 'stop'
    */
-  jarvisAction: async (action) => {
-    return apiRequest('/jarvis/action', 'POST', { action });
+  auraAction: async (action) => {
+    return apiRequest('/aura/action', 'POST', { action });
   }
 };
 

@@ -9,6 +9,7 @@ import os
 import sys
 import signal
 import logging
+import argparse
 from pathlib import Path
 from core.assistant import JarvisAssistant
 from core.theme_manager import ThemeManager
@@ -23,9 +24,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def initialize_core_components():
+def initialize_core_components(headless=False, basic_display=False):
     """
     Initialize all core components required by Jarvis.
+    
+    Args:
+        headless (bool): Whether to run in headless mode (no GUI)
+        basic_display (bool): Whether to use basic display instead of animated
     
     Returns:
         tuple: Initialized component instances
@@ -46,8 +51,8 @@ def initialize_core_components():
         components['dataset_manager'] = DatasetManager()
         
         # Initialize UI components last
-        logger.info("Initializing display...")
-        components['display'] = create_display(use_animated=True)
+        logger.info(f"Initializing display (headless={headless}, basic_display={basic_display})...")
+        components['display'] = create_display(use_animated=not (headless or basic_display), headless=headless)
         
         return (
             components['theme_manager'],
@@ -78,6 +83,32 @@ def main():
     """
     Initialize and run the Jarvis voice assistant with all components.
     """
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Run Jarvis Voice Assistant')
+    parser.add_argument('--headless', action='store_true', 
+                        help='Run in headless mode without GUI (for web deployments)')
+    parser.add_argument('--basic-display', action='store_true',
+                        help='Use basic display instead of animated display')
+    parser.add_argument('--debug', action='store_true',
+                        help='Enable debug logging')
+    args = parser.parse_args()
+    
+    # Set up debug logging if requested
+    if args.debug or os.environ.get('JARVIS_DEBUG') == '1':
+        logging.getLogger().setLevel(logging.DEBUG)
+        logging.getLogger('PIL').setLevel(logging.INFO)  # Keep PIL logs less verbose
+        logger.debug("Debug logging enabled")
+    
+    headless_mode = args.headless
+    basic_display = args.basic_display
+    
+    if headless_mode:
+        logger.info("Running in headless mode")
+    elif basic_display:
+        logger.info("Running with basic display")
+    else:
+        logger.info("Running with animated display")
+    
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -91,7 +122,7 @@ def main():
             profile_manager,
             dataset_manager,
             display
-        ) = initialize_core_components()
+        ) = initialize_core_components(headless=headless_mode, basic_display=basic_display)
         
         # Initialize the main assistant with all components
         logger.info("Initializing main assistant...")
@@ -107,7 +138,7 @@ def main():
         
         # Start the assistant
         logger.info("Starting Jarvis...")
-        assistant.start()
+        assistant.start(headless=headless_mode)
         
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt. Shutting down...")

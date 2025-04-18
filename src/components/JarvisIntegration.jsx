@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { motion } from 'framer-motion';
 import aiService from '../services/aiService';
 
-const JarvisContainer = styled(motion.div)`
+const AuraContainer = styled(motion.div)`
   position: absolute;
   top: 20px;
   left: 20px;
@@ -18,7 +18,7 @@ const JarvisContainer = styled(motion.div)`
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
 `;
 
-const JarvisHeader = styled.div`
+const AuraHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -27,7 +27,7 @@ const JarvisHeader = styled.div`
   padding-bottom: 10px;
 `;
 
-const JarvisTitle = styled.h3`
+const AuraTitle = styled.h3`
   margin: 0;
   color: ${({ theme }) => theme.primary};
   font-size: 16px;
@@ -35,7 +35,7 @@ const JarvisTitle = styled.h3`
   align-items: center;
 `;
 
-const JarvisIcon = styled.div`
+const AuraIcon = styled.div`
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -119,93 +119,93 @@ const SwitchSlider = styled.div`
   }
 `;
 
-const JarvisIntegration = ({ onUseJarvisChange }) => {
-  const [jarvisAvailable, setJarvisAvailable] = useState(false);
-  const [jarvisStatus, setJarvisStatus] = useState({
+const AuraIntegration = ({ onUseAuraChange }) => {
+  const [auraAvailable, setAuraAvailable] = useState(false);
+  const [auraStatus, setAuraStatus] = useState({
     initialized: false,
     running: false,
     components: {}
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [useJarvis, setUseJarvis] = useState(false);
+  const [useAura, setUseAura] = useState(false);
   
   // Check for available integrations
   useEffect(() => {
     const checkIntegrations = async () => {
       try {
         const integrations = await aiService.getIntegrations();
-        setJarvisAvailable(integrations.jarvis);
+        setAuraAvailable(integrations.aura);
         
-        if (integrations.jarvis) {
-          // If Jarvis is available, check its status
-          await checkJarvisStatus();
+        if (integrations.aura) {
+          // If AURA is available, check its status
+          await checkAuraStatus();
         }
       } catch (error) {
         console.error('Error checking integrations:', error);
-        setError('Failed to check for Jarvis integration');
+        setError('Failed to check for AURA integration');
       }
     };
     
     checkIntegrations();
   }, []);
   
-  const checkJarvisStatus = async () => {
+  const checkAuraStatus = async () => {
     try {
-      const status = await aiService.getJarvisStatus();
-      setJarvisStatus(status);
+      const status = await aiService.getAuraStatus();
+      setAuraStatus(status);
       setError(null);
     } catch (error) {
-      console.error('Error checking Jarvis status:', error);
-      setError('Failed to check Jarvis status');
+      console.error('Error checking AURA status:', error);
+      setError('Failed to check AURA status');
     }
   };
   
-  const handleJarvisAction = async (action) => {
+  const handleAuraAction = async (action) => {
     setIsLoading(true);
     setError(null);
     
     try {
-      await aiService.jarvisAction(action);
-      await checkJarvisStatus();
+      await aiService.auraAction(action);
+      await checkAuraStatus();
     } catch (error) {
-      console.error(`Error performing Jarvis action (${action}):`, error);
-      setError(`Failed to ${action} Jarvis: ${error.message}`);
+      console.error(`Error performing AURA action (${action}):`, error);
+      setError(`Failed to ${action} AURA: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
   
-  const handleToggleUseJarvis = () => {
-    const newValue = !useJarvis;
-    setUseJarvis(newValue);
+  const handleToggleUseAura = () => {
+    const newValue = !useAura;
+    setUseAura(newValue);
     
     // Notify parent component
-    if (onUseJarvisChange) {
-      onUseJarvisChange(newValue);
+    if (onUseAuraChange) {
+      onUseAuraChange(newValue);
     }
   };
   
-  if (!jarvisAvailable) {
+  if (!auraAvailable) {
     return null;
   }
   
   return (
-    <JarvisContainer
+    <AuraContainer
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <JarvisHeader>
-        <JarvisTitle>
-          <JarvisIcon isActive={jarvisStatus.running} />
-          Jarvis Integration
-        </JarvisTitle>
-      </JarvisHeader>
+      <AuraHeader>
+        <AuraTitle>
+          <AuraIcon isActive={auraStatus.running} />
+          AURA Core
+        </AuraTitle>
+      </AuraHeader>
       
       <StatusText>
-        Status: {jarvisStatus.initialized 
-          ? (jarvisStatus.running ? 'Running' : 'Initialized (Not Running)') 
+        Status: {auraStatus.initialized 
+          ? (auraStatus.running ? 'Running' : 'Initialized (Not Running)') 
           : 'Not Initialized'}
       </StatusText>
       
@@ -217,30 +217,30 @@ const JarvisIntegration = ({ onUseJarvisChange }) => {
       
       <div>
         <ActionButton
-          onClick={() => handleJarvisAction('initialize')}
-          disabled={isLoading || jarvisStatus.initialized}
-          active={jarvisStatus.initialized}
-          whileHover={{ scale: isLoading || jarvisStatus.initialized ? 1 : 1.05 }}
-          whileTap={{ scale: isLoading || jarvisStatus.initialized ? 1 : 0.95 }}
+          onClick={() => handleAuraAction('initialize')}
+          disabled={isLoading || auraStatus.initialized}
+          active={auraStatus.initialized}
+          whileHover={{ scale: isLoading || auraStatus.initialized ? 1 : 1.05 }}
+          whileTap={{ scale: isLoading || auraStatus.initialized ? 1 : 0.95 }}
         >
           Initialize
         </ActionButton>
         
         <ActionButton
-          onClick={() => handleJarvisAction('start')}
-          disabled={isLoading || !jarvisStatus.initialized || jarvisStatus.running}
-          active={jarvisStatus.running}
-          whileHover={{ scale: isLoading || !jarvisStatus.initialized || jarvisStatus.running ? 1 : 1.05 }}
-          whileTap={{ scale: isLoading || !jarvisStatus.initialized || jarvisStatus.running ? 1 : 0.95 }}
+          onClick={() => handleAuraAction('start')}
+          disabled={isLoading || !auraStatus.initialized || auraStatus.running}
+          active={auraStatus.running}
+          whileHover={{ scale: isLoading || !auraStatus.initialized || auraStatus.running ? 1 : 1.05 }}
+          whileTap={{ scale: isLoading || !auraStatus.initialized || auraStatus.running ? 1 : 0.95 }}
         >
           Start
         </ActionButton>
         
         <ActionButton
-          onClick={() => handleJarvisAction('stop')}
-          disabled={isLoading || !jarvisStatus.running}
-          whileHover={{ scale: isLoading || !jarvisStatus.running ? 1 : 1.05 }}
-          whileTap={{ scale: isLoading || !jarvisStatus.running ? 1 : 0.95 }}
+          onClick={() => handleAuraAction('stop')}
+          disabled={isLoading || !auraStatus.running}
+          whileHover={{ scale: isLoading || !auraStatus.running ? 1 : 1.05 }}
+          whileTap={{ scale: isLoading || !auraStatus.running ? 1 : 0.95 }}
         >
           Stop
         </ActionButton>
@@ -249,22 +249,20 @@ const JarvisIntegration = ({ onUseJarvisChange }) => {
       <ToggleSwitch>
         <SwitchInput
           type="checkbox"
-          id="jarvis-switch"
-          checked={useJarvis}
-          onChange={handleToggleUseJarvis}
-          disabled={!jarvisStatus.running}
+          id="useAura"
+          checked={useAura}
+          onChange={handleToggleUseAura}
         />
-        <SwitchSlider 
-          checked={useJarvis}
-          onClick={handleToggleUseJarvis}
-          style={{ opacity: jarvisStatus.running ? 1 : 0.5 }}
+        <SwitchSlider
+          checked={useAura}
+          onClick={handleToggleUseAura}
         />
-        <SwitchLabel htmlFor="jarvis-switch">
-          {useJarvis ? 'Using Jarvis' : 'Using AURA AI'}
+        <SwitchLabel htmlFor="useAura">
+          {useAura ? 'Using AURA AI' : 'Using Cloud AI'}
         </SwitchLabel>
       </ToggleSwitch>
-    </JarvisContainer>
+    </AuraContainer>
   );
 };
 
-export default JarvisIntegration; 
+export default AuraIntegration; 

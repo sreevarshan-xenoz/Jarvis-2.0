@@ -14,6 +14,7 @@ import webbrowser
 from urllib.parse import urlparse
 from typing import Dict, Any, Optional, List
 from ctypes import cast, POINTER
+from datetime import datetime
 
 # Import dotenv for environment variables
 try:
@@ -81,12 +82,12 @@ except ImportError:
 
 # Check Jarvis integration
 try:
-    import jarvis_bridge
-    jarvis_available = True
-    logger.info("Jarvis bridge imported successfully")
+    import jarvis_bridge as aura_bridge
+    aura_available = True
+    logger.info("AURA core bridge imported successfully")
 except ImportError:
-    jarvis_available = False
-    logger.warning("Jarvis bridge not available")
+    aura_available = False
+    logger.warning("AURA core bridge not available")
     
 # Check RAG integration
 try:
@@ -567,13 +568,13 @@ class CommandRequest(BaseModel):
 class TTSRequest(BaseModel):
     text: str
 
-# Jarvis-specific models
-class JarvisStatusResponse(BaseModel):
+# AURA-specific models
+class AuraStatusResponse(BaseModel):
     initialized: bool
     running: bool
     components: Dict[str, bool]
 
-class JarvisActionRequest(BaseModel):
+class AuraActionRequest(BaseModel):
     action: str  # 'initialize', 'start', 'stop'
 
 # Endpoints
@@ -610,28 +611,48 @@ async def query(request: MessageRequest, request_obj: Request):
 @app.post("/execute")
 @limiter.limit("10/minute")
 async def execute(request: CommandRequest, background_tasks: BackgroundTasks, request_obj: Request):
-    """Execute a command"""
-    global last_command_result
+    """Execute a command with AURA or AI models"""
+    request_ip = request_obj.client.host
+    logger.info(f"Execute command request from {request_ip}: {request.command}")
     
-    try:
-        # Check if we should route to Jarvis
-        if request.use_jarvis and jarvis_available:
-            # Process command through Jarvis
-            result = jarvis_bridge.process_jarvis_command(request.command)
-            last_command_result = result
+    if not request.command:
+        return {"success": False, "message": "No command provided"}
+    
+    # Use AURA if requested
+    if request.use_jarvis and aura_available:
+        try:
+            result = aura_bridge.process_aura_command(request.command)
+            
+            # Store the last command result
+            global last_command_result
+            last_command_result = {
+                "command": request.command,
+                "success": result.get("success", False),
+                "message": result.get("message", ""),
+                "data": result.get("data", {}),
+                "timestamp": datetime.now().isoformat(),
+                "using_aura": True
+            }
+            
             return result
-        else:
-            # Use the standard command execution
-            result = execute_command(request.command)
-            last_command_result = result
-            return result
-    except Exception as e:
-        logger.error(f"Error executing command: {str(e)}")
-        return {
-            "success": False,
-            "message": f"Error executing command: {str(e)}",
-            "command": request.command
-        }
+        except Exception as e:
+            logger.error(f"Error executing command with AURA: {str(e)}")
+            return {"success": False, "message": f"Error: {str(e)}"}
+    
+    # Use AI models otherwise
+    command_response = await execute_command(request.command)
+    
+    # Store the last command result
+    global last_command_result
+    last_command_result = {
+        "command": request.command,
+        "success": True,
+        "message": command_response,
+        "timestamp": datetime.now().isoformat(),
+        "using_aura": False
+    }
+    
+    return {"success": True, "message": command_response}
 
 @app.post("/tts")
 async def text_to_speech(request: TTSRequest):
@@ -689,46 +710,60 @@ async def get_last_command():
         return {"message": "No command has been executed yet"}
     return last_command_result
 
-# Jarvis-specific endpoints
-@app.get("/jarvis/status", response_model=JarvisStatusResponse)
-async def jarvis_status():
-    """Get status of the Jarvis system"""
-    if not jarvis_available:
-        raise HTTPException(status_code=503, detail="Jarvis integration is not available")
+# Get AURA status
+@app.get("/aura/status", response_model=AuraStatusResponse)
+async def aura_status():
+    """Get AURA system status"""
+    if not aura_available:
+        return {"initialized": False, "running": False, "components": {}}
     
-    return jarvis_bridge.get_jarvis_status()
+    try:
+        return aura_bridge.get_aura_status()
+    except Exception as e:
+        logger.error(f"Error getting AURA status: {str(e)}")
+        return {"initialized": False, "running": False, "components": {}}
 
-@app.post("/jarvis/action")
-async def jarvis_action(request: JarvisActionRequest):
-    """Perform an action on the Jarvis system"""
-    if not jarvis_available:
-        raise HTTPException(status_code=503, detail="Jarvis integration is not available")
+# Perform AURA action (initialize, start, stop)
+@app.post("/aura/action")
+async def aura_action(request: AuraActionRequest):
+    """Perform an action on the AURA system (initialize, start, stop)"""
+    if not aura_available:
+        return {"success": False, "message": "AURA core integration is not available"}
     
-    action = request.action.lower()
-    result = False
-    message = ""
-    
-    if action == "initialize":
-        result = jarvis_bridge.initialize_jarvis()
-        message = "Jarvis initialized successfully" if result else "Failed to initialize Jarvis"
-    elif action == "start":
-        result = jarvis_bridge.start_jarvis()
-        message = "Jarvis started successfully" if result else "Failed to start Jarvis"
-    elif action == "stop":
-        result = jarvis_bridge.stop_jarvis()
-        message = "Jarvis stopped successfully" if result else "Failed to stop Jarvis"
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
-    
-    return {"success": result, "message": message, "action": action}
+    try:
+        action = request.action.lower()
+        
+        if action == "initialize":
+            result = aura_bridge.initialize_aura()
+            return {"success": result, "message": "AURA initialized successfully" if result else "Failed to initialize AURA"}
+        elif action == "start":
+            result = aura_bridge.start_aura()
+            return {"success": result, "message": "AURA started successfully" if result else "Failed to start AURA"}
+        elif action == "stop":
+            result = aura_bridge.stop_aura()
+            return {"success": result, "message": "AURA stopped successfully" if result else "Failed to stop AURA"}
+        else:
+            return {"success": False, "message": f"Unknown action: {action}"}
+    except Exception as e:
+        logger.error(f"Error performing AURA action: {str(e)}")
+        return {"success": False, "message": f"Error: {str(e)}"}
 
+# Get available integrations
 @app.get("/integrations")
 async def get_integrations():
-    """Get available integrations"""
+    """Get information about available integrations"""
     return {
-        "jarvis": jarvis_available,
+        "huggingface": huggingface_available,
+        "google_generative_ai": gemini_available,
         "rag": rag_available,
-        "tts": True  # TTS is always available (mock or real)
+        "aura": aura_available,
+        "api_status": model_status,
+        "versions": {
+            "api_server": "2.1.0",
+            "rag_engine": "1.0.5" if rag_available else None,
+            "aura_core": "2.0.0" if aura_available else None,
+            "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+        }
     }
 
 if __name__ == "__main__":
