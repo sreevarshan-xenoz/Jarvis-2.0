@@ -489,19 +489,20 @@ def execute_command(command: str) -> Dict[str, Any]:
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
+# Create static directories if they don't exist
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+AUDIO_DIR = os.path.join(STATIC_DIR, "audio")
+os.makedirs(AUDIO_DIR, exist_ok=True)
+
 # Initialize FastAPI app
-app = FastAPI(
-    title="AURA API",
-    description="API server for AURA - Augmented User Response Assistant",
-    version="1.0.0"
-)
+app = FastAPI(title="AURA API Server")
 
 # Add rate limiter to the app
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Mount static directory for serving audio files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount static files directory
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Global error handler
 @app.middleware("http")
@@ -532,7 +533,7 @@ async def catch_exceptions_middleware(request: Request, call_next):
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to your frontend domains
+    allow_origins=["*"],  # In production, replace with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -621,48 +622,22 @@ async def query(request: MessageRequest, request_obj: Request):
 @app.post("/execute")
 @limiter.limit("10/minute")
 async def execute(request: CommandRequest, background_tasks: BackgroundTasks, request_obj: Request):
-    """Execute a command with AURA or AI models"""
-    request_ip = request_obj.client.host
-    logger.info(f"Execute command request from {request_ip}: {request.command}")
-    
-    if not request.command:
-        return {"success": False, "message": "No command provided"}
-    
-    # Use AURA if requested
-    if request.use_jarvis and aura_available:
-        try:
-            result = aura_bridge.process_aura_command(request.command)
-            
-            # Store the last command result
-            global last_command_result
-            last_command_result = {
-                "command": request.command,
-                "success": result.get("success", False),
-                "message": result.get("message", ""),
-                "data": result.get("data", {}),
-                "timestamp": datetime.now().isoformat(),
-                "using_aura": True
-            }
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error executing command with AURA: {str(e)}")
-            return {"success": False, "message": f"Error: {str(e)}"}
-    
-    # Use AI models otherwise
-    command_response = await execute_command(request.command)
-    
-    # Store the last command result
     global last_command_result
-    last_command_result = {
-        "command": request.command,
-        "success": True,
-        "message": command_response,
-        "timestamp": datetime.now().isoformat(),
-        "using_aura": False
-    }
-    
-    return {"success": True, "message": command_response}
+    try:
+        command = request.command
+        use_jarvis = request.use_jarvis
+        
+        if use_jarvis and not aura_available:
+            raise HTTPException(status_code=400, detail="AURA integration is not available")
+            
+        # Execute the command
+        result = execute_command(command)
+        last_command_result = result
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error executing command: {str(e)}")
+        return {"error": str(e)}
 
 @app.post("/api/tts")
 async def text_to_speech(request: TTSRequest):

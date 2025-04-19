@@ -4,9 +4,11 @@ import styled, { ThemeProvider } from 'styled-components';
 import Spline from '@splinetool/react-spline';
 import ChatInterface from './components/ChatInterface';
 import Header from './components/Header';
-import DiagnosticPanel from './components/DiagnosticPanel';
 import AuraIntegration from './components/AuraIntegration';
 import aiService from './services/aiService';
+import { FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
+import voiceService from './services/voiceService';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const AppContainer = styled.div`
   min-height: 100vh;
@@ -18,36 +20,41 @@ const AppContainer = styled.div`
   overflow: hidden;
 `;
 
-// First scene - now the waves scene as background (previously overlay)
+// First scene - now the waves scene as background
 const SplineBackgroundContainer = styled.div`
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
-  pointer-events: auto;
+  z-index: 2;
+  opacity: ${({ isLoading }) => isLoading ? 0 : 0.7};
+  transition: opacity 0.5s ease;
 `;
 
-// Second scene - now the qX39 scene as overlay with opacity (previously background)
+// Second scene - now the qX39 scene as overlay with opacity
 const SplineForegroundContainer = styled.div`
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 2;
-  pointer-events: auto;
-  opacity: 0.5;
+  z-index: 1;
+  opacity: ${({ isLoading }) => isLoading ? 0 : 1};
+  transition: opacity 0.5s ease;
 `;
 
 const ContentLayer = styled.div`
   position: relative;
-  z-index: 3;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   pointer-events: none;
+  
+  & > * {
+    pointer-events: auto;
+  }
 `;
 
 const HeaderContainer = styled.div`
@@ -55,8 +62,14 @@ const HeaderContainer = styled.div`
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 4;
+  z-index: 3;
   pointer-events: auto;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+  padding: 1rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const BottomContainer = styled.div`
@@ -67,12 +80,14 @@ const BottomContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-bottom: 2rem;
-  z-index: 4;
+  padding: 2rem;
+  z-index: 15;
   pointer-events: none;
   
   & > * {
     pointer-events: auto;
+    width: 100%;
+    max-width: 800px;
   }
 `;
 
@@ -84,11 +99,20 @@ const CommandBar = styled(motion.div)`
   border-radius: 30px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   padding: 0 1.5rem;
   box-shadow: 0 0 15px rgba(66, 220, 219, 0.5), 0 0 30px rgba(120, 0, 255, 0.3);
   border: 1px solid rgba(128, 0, 255, 0.4);
   margin-top: 1rem;
+  z-index: 20;
+  pointer-events: auto;
+  
+  form {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    pointer-events: auto;
+  }
 `;
 
 const CommandInput = styled.input`
@@ -99,6 +123,8 @@ const CommandInput = styled.input`
   color: white;
   padding: 0 1rem;
   font-size: 1rem;
+  pointer-events: auto;
+  cursor: text;
   
   &:focus {
     outline: none;
@@ -173,36 +199,52 @@ const NotificationContainer = styled(motion.div)`
   z-index: 5;
 `;
 
-const DiagnosticButton = styled(motion.button)`
-  position: absolute;
+const TopRightControls = styled.div`
+  position: fixed;
   top: 1rem;
   right: 1rem;
-  background: linear-gradient(135deg, rgba(66, 220, 219, 0.2), rgba(165, 55, 253, 0.2));
-  border: 1px solid rgba(66, 220, 219, 0.3);
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 5px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  z-index: 10;
   display: flex;
-  align-items: center;
   gap: 0.5rem;
-  
-  &:hover {
-    background: linear-gradient(135deg, rgba(66, 220, 219, 0.3), rgba(165, 55, 253, 0.3));
-  }
+  z-index: 20;
 `;
 
-const DiagnosticIcon = styled.span`
-  display: inline-block;
-  width: 14px;
-  height: 14px;
+const MicButton = styled(motion.button)`
+  background: ${({ active }) => 
+    active 
+      ? 'rgba(66, 220, 219, 0.3)'
+      : 'rgba(74, 158, 255, 0.2)'};
+  border: 1px solid ${({ active }) => 
+    active 
+      ? '#42dcdb'
+      : '#4a9eff'};
+  color: ${({ active }) => 
+    active 
+      ? '#42dcdb'
+      : '#4a9eff'};
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: ${({ isOnline }) => 
-    isOnline ? 'rgba(66, 220, 219, 0.8)' : 'rgba(255, 87, 87, 0.8)'};
-  box-shadow: 0 0 5px ${({ isOnline }) => 
-    isOnline ? 'rgba(66, 220, 219, 0.6)' : 'rgba(255, 87, 87, 0.6)'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  
+  &:hover {
+    background: ${({ active }) => 
+      active 
+        ? 'rgba(66, 220, 219, 0.4)'
+        : 'rgba(74, 158, 255, 0.3)'};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const WatermarkCover = styled.div`
@@ -244,15 +286,18 @@ const App = () => {
   });
   const [command, setCommand] = useState('');
   const [modelStatus, setModelStatus] = useState({ online: false, status: 'Checking status...' });
-  const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [notification, setNotification] = useState(null);
   const [useAura, setUseAura] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState(null);
   const backgroundSplineRef = useRef();
   const foregroundSplineRef = useRef();
   const audioRef = useRef(new Audio());
   const [playingAudioId, setPlayingAudioId] = useState(null);
+  const splineRef = useRef(null);
+  const [splineLoading, setSplineLoading] = useState({ background: true, foreground: true });
 
   useEffect(() => {
     // Check model status on initial load
@@ -306,22 +351,39 @@ const App = () => {
   };
 
   const onLoadBackground = (splineApp) => {
-    backgroundSplineRef.current = splineApp;
-    console.log('Background Spline scene loaded');
+    try {
+      if (splineApp) {
+        backgroundSplineRef.current = splineApp;
+        setSplineLoading(prev => ({ ...prev, background: false }));
+        console.log('Background Spline scene loaded');
+      }
+    } catch (error) {
+      console.error('Error loading background scene:', error);
+      setSplineLoading(prev => ({ ...prev, background: false }));
+    }
   };
 
   const onLoadForeground = (splineApp) => {
-    foregroundSplineRef.current = splineApp;
-    console.log('Foreground Spline scene loaded');
+    try {
+      if (splineApp) {
+        foregroundSplineRef.current = splineApp;
+        setSplineLoading(prev => ({ ...prev, foreground: false }));
+        console.log('Foreground Spline scene loaded');
+      }
+    } catch (error) {
+      console.error('Error loading foreground scene:', error);
+      setSplineLoading(prev => ({ ...prev, foreground: false }));
+    }
   };
 
   const handleUnifiedInput = async (e) => {
     e.preventDefault();
+    
     if (!command.trim()) return;
 
     const userInput = command.trim();
-    setCommand('');
-    setIsLoading(true);
+    setCommand(''); // Clear input field immediately
+    setIsLoading(true); // Set loading state
 
     // Add user message to chat history
     const userMessage = {
@@ -332,37 +394,46 @@ const App = () => {
     setMessages(prevMessages => [...prevMessages, userMessage]);
 
     try {
-      // Check if input starts with a command prefix like "/"
       if (userInput.startsWith('/')) {
-        // Handle as command
-        const cmdText = userInput.substring(1); // Remove the slash
+        // Handle command
+        const cmdText = userInput.substring(1);
         showNotification('Executing command...');
         
-        const result = await aiService.executeCommand(cmdText, useAura);
-        
-        // Add command result to chat
-        const responseMessage = {
-          id: Date.now(),
-          role: 'assistant',
-          content: result.message || 'Command executed'
-        };
-        setMessages(prevMessages => [...prevMessages, responseMessage]);
-        
-        if (result.success) {
-          showNotification(result.message || 'Command executed successfully');
-        } else {
-          showNotification(result.message || 'Command execution failed');
-        }
+        try {
+          const result = await aiService.executeCommand(cmdText, useAura);
+          const responseMessage = {
+            id: Date.now(),
+            role: 'assistant',
+            content: result.message || 'Command executed'
+          };
+          setMessages(prevMessages => [...prevMessages, responseMessage]);
+          
+          if (result.success) {
+            showNotification(result.message || 'Command executed successfully');
+          } else {
+            showNotification(result.message || 'Command execution failed');
+          }
 
-        // Auto-play response if voice mode is on
-        if (voiceMode) {
-          playMessageAudio(responseMessage);
+          if (voiceMode) {
+            playMessageAudio(responseMessage);
+          }
+        } catch (cmdError) {
+          console.error('Command execution error:', cmdError);
+          const errorMessage = {
+            id: Date.now(),
+            role: 'assistant',
+            content: `Command Error: ${cmdError.message || 'Failed to execute command'}`
+          };
+          setMessages(prevMessages => [...prevMessages, errorMessage]);
+          showNotification(`Command Error: ${cmdError.message || 'Failed to execute command'}`);
         }
       } else {
-        // Handle as conversation
+        // Handle conversation
+        if (!modelStatus.online) {
+          throw new Error('AI model is currently offline. Use /commands only.');
+        }
+
         const response = await aiService.sendMessage(userInput);
-        
-        // Add AI response to chat
         const responseMessage = {
           id: Date.now(),
           role: 'assistant',
@@ -370,7 +441,6 @@ const App = () => {
         };
         setMessages(prevMessages => [...prevMessages, responseMessage]);
         
-        // Auto-play response if voice mode is on
         if (voiceMode) {
           playMessageAudio(responseMessage);
         }
@@ -379,7 +449,6 @@ const App = () => {
       console.error('Error processing input:', error);
       showNotification(`Error: ${error.message || 'Failed to process input'}`);
       
-      // Add error message to chat
       const errorMessage = {
         id: Date.now(),
         role: 'assistant',
@@ -387,7 +456,7 @@ const App = () => {
       };
       setMessages(prevMessages => [...prevMessages, errorMessage]);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Always reset loading state
     }
   };
 
@@ -482,6 +551,40 @@ const App = () => {
     showNotification(newMode ? 'Voice mode enabled' : 'Voice mode disabled');
   };
 
+  const toggleMicrophone = async () => {
+    if (isListening) {
+      voiceService.stopRealtimeRecognition();
+      setIsListening(false);
+    } else {
+      try {
+        const hasPermission = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (hasPermission) {
+          setIsListening(true);
+          await voiceService.startRealtimeRecognition(
+            // Transcript callback
+            (text) => {
+              if (text.trim()) {
+                // Handle the voice input
+                console.log('Voice input:', text);
+                // Add your logic to process the voice input here
+              }
+            },
+            // Error callback
+            (error) => {
+              console.error('Voice recognition error:', error);
+              setIsListening(false);
+              setError(typeof error === 'string' ? error : 'Voice recognition failed');
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Microphone permission error:', error);
+        setError('Please grant microphone permission to use voice features');
+        setIsListening(false);
+      }
+    }
+  };
+
   return (
     <ThemeProvider theme={darkTheme}>
       <AppContainer>
@@ -505,7 +608,7 @@ const App = () => {
             fontSize: '12px',
             padding: '6px 12px',
             cursor: 'pointer',
-            zIndex: 10,
+            zIndex: 20,
             backdropFilter: 'blur(4px)'
           }}
           onClick={clearChatHistory}
@@ -515,62 +618,42 @@ const App = () => {
           Clear History
         </motion.button>
         
-        <motion.button
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '120px',
-            background: 'rgba(30, 30, 50, 0.7)',
-            border: `1px solid ${voiceMode ? 'rgba(66, 220, 219, 0.6)' : 'rgba(255, 255, 255, 0.4)'}`,
-            borderRadius: '20px',
-            color: voiceMode ? 'rgba(66, 220, 219, 0.9)' : 'rgba(255, 255, 255, 0.8)',
-            fontSize: '12px',
-            padding: '6px 12px',
-            cursor: 'pointer',
-            zIndex: 10,
-            backdropFilter: 'blur(4px)'
-          }}
-          onClick={toggleVoiceMode}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Voice {voiceMode ? 'On' : 'Off'}
-        </motion.button>
+        <TopRightControls>
+          <MicButton
+            onClick={() => {
+              toggleVoiceMode();
+              toggleMicrophone();
+            }}
+            active={voiceMode}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            disabled={!!error && error.includes('microphone permission')}
+          >
+            {voiceMode ? <FaMicrophoneSlash /> : <FaMicrophone />}
+          </MicButton>
+        </TopRightControls>
         
-        <DiagnosticButton
-          onClick={() => setShowDiagnostic(true)}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <DiagnosticIcon isOnline={modelStatus.online} />
-          Run Diagnostic
-        </DiagnosticButton>
-        
-        {/* The newer 3D scene forms the solid background */}
-        <SplineBackgroundContainer>
-          <Spline 
-            scene="https://prod.spline.design/qX39OiHwKkpiLOPh/scene.splinecode" 
-            onLoad={onLoadBackground}
-            style={{ width: '100%', height: '100%' }}
-            hideAttribution={true}
-          />
+        <SplineBackgroundContainer isLoading={splineLoading.background}>
+          <ErrorBoundary fallback={<div style={{ display: 'none' }} />}>
+            <Spline 
+              scene="https://prod.spline.design/q2c5wAVesDdTQQ8A/scene.splinecode"
+              onLoad={onLoadBackground}
+              style={{ width: '100%', height: '100%' }}
+              hideAttribution={true}
+            />
+          </ErrorBoundary>
         </SplineBackgroundContainer>
         
-        {/* The wave design overlays with partial transparency */}
-        <SplineForegroundContainer>
-          <Spline 
-            scene="https://prod.spline.design/q2c5wAVesDdTQQ8A/scene.splinecode" 
-            onLoad={onLoadForeground}
-            style={{ width: '100%', height: '100%' }}
-            hideAttribution={true}
-          />
+        <SplineForegroundContainer isLoading={splineLoading.foreground}>
+          <ErrorBoundary fallback={<div style={{ display: 'none' }} />}>
+            <Spline 
+              scene="https://prod.spline.design/qX39OiHwKkpiLOPh/scene.splinecode"
+              onLoad={onLoadForeground}
+              style={{ width: '100%', height: '100%' }}
+              hideAttribution={true}
+            />
+          </ErrorBoundary>
         </SplineForegroundContainer>
-        
-        <AnimatePresence>
-          {showDiagnostic && (
-            <DiagnosticPanel onClose={() => setShowDiagnostic(false)} />
-          )}
-        </AnimatePresence>
         
         <ContentLayer>
           <HeaderContainer>
@@ -578,88 +661,37 @@ const App = () => {
           </HeaderContainer>
           
           <BottomContainer>
-            {/* Chat Display Section */}
-            <ChatDisplayContainer>
-              <ChatHeader>
-                <HeaderLeft>
-                  <VoiceIndicator 
-                    animate={{ 
-                      boxShadow: ['0 0 10px rgba(66, 220, 219, 0.5)', '0 0 20px rgba(165, 55, 253, 0.5)', '0 0 10px rgba(66, 220, 219, 0.5)']
-                    }}
-                    transition={{ repeat: Infinity, duration: 2 }}
-                  />
-                  <HeaderTitle>AURA</HeaderTitle>
-                </HeaderLeft>
-                <div>
-                  {playingAudioId && playingAudioId !== 'loading' && (
-                    <span style={{ fontSize: '0.8rem', color: 'rgba(66, 220, 219, 0.9)' }}>
-                      Playing audio...
-                    </span>
-                  )}
-                </div>
-              </ChatHeader>
-              
-              <ChatBody>
-                <AnimatePresence>
-                  {messages.map((message) => (
-                    <ChatMessage 
-                      key={message.id}
-                      isUser={message.role === 'user'}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                    >
-                      {message.content}
-                      {message.role === 'assistant' && (
-                        <AudioButton 
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => playMessageAudio(message)}
-                        >
-                          {playingAudioId === message.id ? '⏸' : '🔊'}
-                        </AudioButton>
-                      )}
-                    </ChatMessage>
-                  ))}
-                </AnimatePresence>
+            <ChatInterface
+              messages={messages}
+              onSendMessage={async (message) => {
+                if (!message.trim()) return;
                 
-                {isLoading && (
-                  <LoadingContainer>
-                    <LoadingDots>
-                      <motion.span animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} />
-                      <motion.span animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} />
-                      <motion.span animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} />
-                    </LoadingDots>
-                  </LoadingContainer>
-                )}
-              </ChatBody>
-            </ChatDisplayContainer>
-            
-            <CommandBar
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              as="form"
-              onSubmit={handleUnifiedInput}
-            >
-              <CommandInput 
-                placeholder="Enter message or /command..."
-                value={command}
-                onChange={(e) => setCommand(e.target.value)}
-                disabled={isLoading}
-              />
-              <SendButton 
-                type="submit"
-                disabled={isLoading || !command.trim()}
-                whileHover={{ scale: isLoading ? 1 : 1.05 }}
-                whileTap={{ scale: isLoading ? 1 : 0.95 }}
-              >
-                {isLoading ? (
-                  <LoadingIcon />
-                ) : (
-                  <SendIcon />
-                )}
-              </SendButton>
-            </CommandBar>
+                const userMessage = {
+                  role: 'user',
+                  content: message,
+                  id: Date.now()
+                };
+                
+                setMessages(prev => [...prev, userMessage]);
+                setIsLoading(true);
+                
+                try {
+                  const response = await aiService.sendMessage(message);
+                  const assistantMessage = {
+                    role: 'assistant',
+                    content: response.message,
+                    id: Date.now() + 1
+                  };
+                  setMessages(prev => [...prev, assistantMessage]);
+                } catch (error) {
+                  console.error('Error sending message:', error);
+                  showNotification('Error sending message. Please try again.');
+                } finally {
+                  setIsLoading(false);
+                }
+              }}
+              isProcessing={isLoading}
+            />
 
             {notification && (
               <NotificationContainer
@@ -690,6 +722,7 @@ const ChatDisplayContainer = styled.div`
   overflow: hidden;
   border: 1px solid rgba(128, 0, 255, 0.4);
   margin-bottom: 20px;
+  pointer-events: auto;
 `;
 
 const ChatHeader = styled.div`
@@ -733,6 +766,7 @@ const ChatBody = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  pointer-events: auto;
   
   &::-webkit-scrollbar {
     width: 4px;
@@ -770,6 +804,7 @@ const ChatMessage = styled(motion.div)`
       ? 'rgba(66, 220, 219, 0.3)' 
       : 'rgba(165, 55, 253, 0.3)'};
   font-size: 0.9rem;
+  pointer-events: auto;
   
   &:hover {
     transform: translateY(-1px);
@@ -793,59 +828,72 @@ const AudioButton = styled(motion.button)`
   color: white;
   font-size: 0.7rem;
   padding: 0;
+  pointer-events: auto;
   
   &:hover {
     background: linear-gradient(135deg, rgba(66, 220, 219, 0.5), rgba(165, 55, 253, 0.5));
   }
 `;
 
-const LoadingContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  padding: 0.5rem;
-`;
-
-const LoadingDots = styled.div`
-  display: flex;
-  gap: 4px;
-  
-  span {
-    width: 8px;
-    height: 8px;
-    background: linear-gradient(90deg, #42dcdb, #a537fd);
-    border-radius: 50%;
-  }
-`;
-
-const SendButton = styled(motion.button)`
-  background: linear-gradient(135deg, rgba(66, 220, 219, 0.7), rgba(165, 55, 253, 0.7));
+const SendButton = styled.button`
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  background: linear-gradient(45deg, #2196f3, #00bcd4);
   border: none;
-  width: 36px;
-  height: 36px;
   border-radius: 50%;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 10px;
-  color: white;
   cursor: pointer;
-  
+  transition: all 0.3s ease;
+  z-index: 25;
+
+  &:hover {
+    transform: scale(1.1);
+    background: linear-gradient(45deg, #00bcd4, #2196f3);
+  }
+
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 `;
 
-const LoadingIcon = () => (
-  <motion.div
-    animate={{ rotate: 360 }}
-    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-    style={{ width: '16px', height: '16px', borderRadius: '50%', 
-            border: '2px solid rgba(255,255,255,0.2)', 
-            borderTopColor: 'white' }}
-  />
-);
+const LoadingIcon = styled.div`
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  animation: spin 1s linear infinite;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+`;
 
-const SendIcon = () => <span>➤</span>;
+const SendIcon = styled.span`
+  font-size: 16px;
+  color: white;
+`;
+
+const Controls = styled.div`
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 1rem;
+  z-index: 100;
+`;
+
+const SplineContainer = styled.div`
+  width: 100%;
+  height: 100%;
+  position: absolute;
+`;
 
 export default App;
