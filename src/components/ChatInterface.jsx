@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import aiService from '../services/aiService';
+import voiceService from '../services/voiceService';
+import { FaMicrophone, FaMicrophoneSlash, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 // Import FixedSizeList only if you need virtualization
 // import { FixedSizeList as List } from 'react-window';
 
@@ -334,6 +336,64 @@ const SendButton = styled(motion.button)`
   }
 `;
 
+const VoiceControls = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  margin-bottom: 10px;
+`;
+
+const VoiceSettings = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: center;
+`;
+
+const VoiceSelect = styled.select`
+  background: rgba(20, 20, 30, 0.7);
+  border: 1px solid rgba(128, 0, 255, 0.3);
+  border-radius: 10px;
+  color: white;
+  padding: 5px;
+  font-size: 0.8rem;
+
+  &:focus {
+    outline: none;
+    border-color: rgba(66, 220, 219, 0.6);
+  }
+`;
+
+const RangeInput = styled.input`
+  width: 100px;
+  accent-color: #42dcdb;
+`;
+
+const VoiceButton = styled.button`
+  background: ${props => props.active ? '#4CAF50' : '#2196F3'};
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+`;
+
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -343,6 +403,17 @@ const ChatInterface = () => {
   const [inputMessage, setInputMessage] = useState('');
   const chatBodyRef = useRef(null);
   const audioRef = useRef(new Audio());
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const messagesEndRef = useRef(null);
+  const [voiceSettings, setVoiceSettings] = useState({
+    voice: '',
+    rate: 1.0,
+    pitch: 1.0,
+    volume: 1.0
+  });
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [isRealTimeVoice, setIsRealTimeVoice] = useState(false);
 
   // Add welcome message on initial load
   useEffect(() => {
@@ -394,59 +465,137 @@ const ChatInterface = () => {
     };
   }, []);
 
+  // Add cleanup on unmount
+  useEffect(() => {
+    return () => {
+      voiceService.cleanup();
+    };
+  }, []);
+
+  // Handle voice initialization errors
+  const initializeVoice = async () => {
+    try {
+      const hasPermission = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (hasPermission) {
+        return true;
+      }
+    } catch (error) {
+      console.error('Microphone permission error:', error);
+      setError('Please grant microphone permission to use voice features');
+      return false;
+    }
+  };
+
+  const toggleRealTimeVoice = async () => {
+    if (isRealTimeVoice) {
+      voiceService.stopRealtimeRecognition();
+      setIsRealTimeVoice(false);
+    } else {
+      const initialized = await initializeVoice();
+      if (!initialized) return;
+
+      try {
+        setIsRealTimeVoice(true);
+        await voiceService.startRealtimeRecognition(
+          // Transcript callback
+          (text) => {
+            if (text.trim()) {
+              setInputMessage(text);
+              handleSendMessage({ preventDefault: () => {} });
+            }
+          },
+          // Error callback
+          (error) => {
+            console.error('Voice recognition error:', error);
+            setIsRealTimeVoice(false);
+            setError(typeof error === 'string' ? error : 'Voice recognition failed');
+          }
+        );
+      } catch (error) {
+        console.error('Failed to start real-time voice:', error);
+        setIsRealTimeVoice(false);
+        setError('Failed to start voice recognition. Please try again.');
+      }
+    }
+  };
+
   const playMessageAudio = async (message) => {
     try {
-      // If already playing this message's audio, stop it
       if (playingAudioId === message.id) {
-        audioRef.current.pause();
+        voiceService.stopSpeaking();
         setPlayingAudioId(null);
         return;
       }
-      
-      // Stop any currently playing audio
-      audioRef.current.pause();
-      
-      let audioUrl;
-      
-      // If no audio URL exists for this message yet, generate one
-      if (!message.audioUrl) {
-        setPlayingAudioId('loading');
-        
-        // Convert text to audio through AI service
-        const result = await aiService.textToSpeech(message.text);
-        
-        // Update the message with the audio URL
-        audioUrl = result.audioUrl;
-        setMessages(prevMessages => 
-          prevMessages.map(msg => 
-            msg.id === message.id ? { ...msg, audioUrl: audioUrl } : msg
-          )
-        );
-      } else {
-        audioUrl = message.audioUrl;
-      }
-      
-      // Play the audio
-      audioRef.current.src = audioUrl;
-      
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setPlayingAudioId(message.id);
-          })
-          .catch(error => {
-            console.error('Audio play error:', error);
-            setError('Browser blocked audio playback. Please interact with the page first.');
-            setPlayingAudioId(null);
-          });
-      }
+
+      setPlayingAudioId(message.id);
+      await voiceService.speak(message.text, voiceSettings);
+      setPlayingAudioId(null);
     } catch (error) {
       console.error('Error playing audio:', error);
-      setError('Failed to play audio: ' + error.message);
+      setError(error.message || 'Failed to play audio');
       setPlayingAudioId(null);
     }
   };
+
+  // Enhanced voice settings handling
+  const handleVoiceSettingChange = (setting, value) => {
+    try {
+      // Validate value ranges
+      switch (setting) {
+        case 'rate':
+        case 'pitch':
+          value = Math.max(0.1, Math.min(value, 2.0));
+          break;
+        case 'volume':
+          value = Math.max(0, Math.min(value, 1.0));
+          break;
+      }
+
+      setVoiceSettings(prev => ({
+        ...prev,
+        [setting]: value
+      }));
+    } catch (error) {
+      console.error('Error updating voice settings:', error);
+      setError('Failed to update voice settings');
+    }
+  };
+
+  // Load voices with retry
+  useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    const loadVoices = () => {
+      try {
+        const voices = voiceService.getVoices();
+        if (voices.length > 0) {
+          setAvailableVoices(voices);
+          setVoiceSettings(prev => ({
+            ...prev,
+            voice: voices[0].name
+          }));
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error loading voices:', error);
+        return false;
+      }
+    };
+
+    const tryLoadVoices = () => {
+      if (!loadVoices() && retryCount < maxRetries) {
+        retryCount++;
+        setTimeout(tryLoadVoices, 1000);
+      }
+    };
+
+    if (typeof speechSynthesis !== 'undefined') {
+      speechSynthesis.onvoiceschanged = tryLoadVoices;
+      tryLoadVoices();
+    }
+  }, []);
 
   const toggleVoiceMode = () => {
     const newMode = !voiceMode;
@@ -506,6 +655,27 @@ const ChatInterface = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleInputChange = (e) => {
+    setInputMessage(e.target.value);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!inputMessage.trim()) return;
+
+    const message = inputMessage.trim();
+    setInputMessage('');
+    await handleSendMessage(e);
   };
 
   return (
@@ -617,17 +787,77 @@ const ChatInterface = () => {
         </MessageList>
       </ChatBody>
 
-      <InputForm onSubmit={handleSendMessage}>
+      <VoiceControls>
+        <VoiceButton
+          onClick={toggleRealTimeVoice}
+          active={isRealTimeVoice}
+          title={isRealTimeVoice ? 'Stop real-time voice' : 'Start real-time voice'}
+          disabled={!!error && error.includes('microphone permission')}
+        >
+          {isRealTimeVoice ? <FaMicrophoneSlash /> : <FaMicrophone />}
+        </VoiceButton>
+        
+        <VoiceButton
+          onClick={() => setIsSpeaking(!isSpeaking)}
+          active={isSpeaking}
+          title={isSpeaking ? 'Disable speech' : 'Enable speech'}
+          disabled={availableVoices.length === 0}
+        >
+          {isSpeaking ? <FaVolumeMute /> : <FaVolumeUp />}
+        </VoiceButton>
+
+        <VoiceSettings>
+          <VoiceSelect
+            value={voiceSettings.voice}
+            onChange={(e) => handleVoiceSettingChange('voice', e.target.value)}
+            disabled={availableVoices.length === 0}
+          >
+            {availableVoices.map(voice => (
+              <option key={voice.name} value={voice.name}>
+                {voice.name} ({voice.lang})
+              </option>
+            ))}
+          </VoiceSelect>
+
+          <label>
+            Rate:
+            <RangeInput
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={voiceSettings.rate}
+              onChange={(e) => handleVoiceSettingChange('rate', parseFloat(e.target.value))}
+              disabled={!isSpeaking}
+            />
+          </label>
+
+          <label>
+            Pitch:
+            <RangeInput
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={voiceSettings.pitch}
+              onChange={(e) => handleVoiceSettingChange('pitch', parseFloat(e.target.value))}
+              disabled={!isSpeaking}
+            />
+          </label>
+        </VoiceSettings>
+      </VoiceControls>
+
+      <InputForm onSubmit={handleSubmit}>
         <MessageInput
           type="text"
           value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
+          onChange={handleInputChange}
           placeholder="Type a message..."
-          disabled={isLoading}
+          disabled={isLoading || isRealTimeVoice}
         />
         <SendButton
           type="submit"
-          disabled={isLoading || !inputMessage.trim()}
+          disabled={isLoading || !inputMessage.trim() || isRealTimeVoice}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           aria-label="Send message"

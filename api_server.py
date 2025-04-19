@@ -15,6 +15,10 @@ from urllib.parse import urlparse
 from typing import Dict, Any, Optional, List
 from ctypes import cast, POINTER
 from datetime import datetime
+import uuid
+from gtts import gTTS
+import speech_recognition as sr
+import asyncio
 
 # Import dotenv for environment variables
 try:
@@ -31,10 +35,10 @@ logging.basicConfig(
 logger = logging.getLogger("api-server")
 
 # FastAPI imports
-from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 
 # Third-party imports
@@ -567,6 +571,12 @@ class CommandRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
+    voice_id: Optional[str] = None
+    language: Optional[str] = "en"
+
+class STTRequest(BaseModel):
+    audio_data: str  # Base64 encoded audio data
+    language: Optional[str] = "en-US"
 
 # AURA-specific models
 class AuraStatusResponse(BaseModel):
@@ -654,54 +664,108 @@ async def execute(request: CommandRequest, background_tasks: BackgroundTasks, re
     
     return {"success": True, "message": command_response}
 
-@app.post("/tts")
+@app.post("/api/tts")
 async def text_to_speech(request: TTSRequest):
-    """Convert text to speech"""
+    """Convert text to speech and return audio URL"""
     try:
-        from gtts import gTTS
-        import uuid
-        import os
-        
-        # Create a unique filename for this audio
+        # Create unique filename for this audio
         filename = f"tts_{uuid.uuid4()}.mp3"
-        
-        # Use public directory for Vercel, static directory otherwise
-        if os.environ.get("VERCEL_ENV"):
-            output_path = os.path.join("public", "static", "audio")
-            audio_url_prefix = "/static/audio"  # Vercel serves files from public directly
-        else:
-            output_path = os.path.join("static", "audio")
-            audio_url_prefix = "/static/audio"
-        
-        # Ensure directory exists
-        os.makedirs(output_path, exist_ok=True)
-        
-        full_path = os.path.join(output_path, filename)
+        filepath = os.path.join(AUDIO_DIR, filename)
         
         # Generate speech using gTTS
-        tts = gTTS(text=request.text, lang='en', slow=False)
-        tts.save(full_path)
+        tts = gTTS(text=request.text, lang=request.language)
+        tts.save(filepath)
         
-        # Return the URL to the audio file
-        audio_url = f"{audio_url_prefix}/{filename}"
-        
-        # Calculate estimated duration (rough estimate: 150 chars per 10 seconds)
-        duration = len(request.text) / 15
+        # Return URL to access the audio file
+        audio_url = f"/static/audio/{filename}"
         
         return {
-            "audioUrl": audio_url,
-            "duration": duration
-        }
-    except ImportError:
-        # Fallback to mock if gtts is not installed
-        logger.warning("gtts not installed, using mock TTS response")
-        return {
-            "audioUrl": "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm.ogg",
-            "duration": len(request.text) / 20
+            "success": True,
+            "audio_url": audio_url,
+            "duration": len(request.text) / 15  # Rough estimate
         }
     except Exception as e:
-        logger.error(f"Error in TTS endpoint: {str(e)}")
+        logger.error(f"TTS error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/stt")
+async def speech_to_text(request: STTRequest):
+    """Convert speech to text"""
+    try:
+        import base64
+        import tempfile
+        import wave
+        
+        # Decode base64 audio data
+        audio_data = base64.b64decode(request.audio_data)
+        
+        # Save to temporary WAV file
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+            with wave.open(temp_file.name, 'wb') as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(16000)
+                wav_file.writeframes(audio_data)
+        
+        # Initialize speech recognition
+        recognizer = sr.Recognizer()
+        
+        # Convert speech to text
+        with sr.AudioFile(temp_file.name) as source:
+            audio = recognizer.record(source)
+            text = recognizer.recognize_google(audio, language=request.language)
+        
+        # Clean up temporary file
+        os.unlink(temp_file.name)
+        
+        return {
+            "success": True,
+            "text": text
+        }
+    except Exception as e:
+        logger.error(f"STT error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.websocket("/ws/voice")
+async def voice_websocket(websocket: WebSocket):
+    """WebSocket endpoint for real-time voice communication"""
+    await websocket.accept()
+    
+    try:
+        while True:
+            # Receive audio data from client
+            data = await websocket.receive_bytes()
+            
+            # Initialize speech recognition
+            recognizer = sr.Recognizer()
+            
+            # Convert audio data to text
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as temp_file:
+                temp_file.write(data)
+                temp_file.flush()
+                
+                with sr.AudioFile(temp_file.name) as source:
+                    audio = recognizer.record(source)
+                    text = recognizer.recognize_google(audio)
+            
+            # Send text back to client
+            await websocket.send_json({
+                "type": "transcript",
+                "text": text
+            })
+            
+            # Process the command if needed
+            if text.strip().lower() in ["exit", "quit", "stop"]:
+                break
+                
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        await websocket.send_json({
+            "type": "error",
+            "message": str(e)
+        })
+    finally:
+        await websocket.close()
 
 @app.get("/last-command")
 async def get_last_command():

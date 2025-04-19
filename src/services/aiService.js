@@ -78,7 +78,22 @@ const aiService = {
    * @param {string} text - The text to convert to speech
    */
   textToSpeech: async (text) => {
-    return apiRequest('/tts', 'POST', { text });
+    try {
+      const result = await apiRequest('/api/tts', 'POST', { text });
+      if (!result.audio_url) {
+        throw new Error('No audio URL returned from TTS service');
+      }
+      // Ensure the audio URL is absolute
+      return {
+        audioUrl: result.audio_url.startsWith('http') 
+          ? result.audio_url 
+          : `${API_BASE_URL}${result.audio_url}`
+      };
+    } catch (error) {
+      console.error('TTS error:', error);
+      // Return fallback audio URL for testing
+      return { audioUrl: FALLBACK_AUDIO_URL };
+    }
   },
   
   /**
@@ -151,10 +166,7 @@ const aiService = {
       });
     }
     
-    return {
-      timestamp: new Date().toLocaleString(),
-      tests
-    };
+    return tests;
   },
   
   /**
