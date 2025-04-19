@@ -77,4 +77,41 @@ a[href*="spline.design"]{
   transform: scale(0) !important;
   pointer-events: none !important;
   z-index: -9999 !important;
+}
+
+/* Message styling */
+.message-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.message-text {
+  line-height: 1.5;
+}
+
+.message-source {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.user-avatar, .ai-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.user-avatar {
+  background: #3498db;
+}
+
+.ai-avatar {
+  background: #9b59b6;
 } 

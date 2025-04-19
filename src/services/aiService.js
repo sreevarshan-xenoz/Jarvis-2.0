@@ -1,4 +1,5 @@
 import supabase from './supabase';
+import gradioService from './gradioService';
 
 // Fallback audio URL for testing when the Supabase function is not available
 const FALLBACK_AUDIO_URL = 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg';
@@ -14,6 +15,9 @@ const FALLBACK_AUDIO_URL = 'https://actions.google.com/sounds/v1/alarms/beep_sho
 
 // Base URL for API calls
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+// Add a flag to control whether to use the Gradio API
+let useGradioApi = true;
 
 // Helper function for API requests
 const apiRequest = async (endpoint, method = 'GET', body = null) => {
@@ -68,8 +72,31 @@ const aiService = {
   /**
    * Send a message to the AI assistant
    * @param {string} message - The message to send
+   * @param {Object} options - Additional options
    */
-  sendMessage: async (message) => {
+  sendMessage: async (message, options = {}) => {
+    // Try using Gradio API first if enabled
+    if (useGradioApi) {
+      try {
+        const systemMessage = options.systemMessage || "";
+        const response = await gradioService.chat(message, systemMessage, {
+          temperature: options.temperature || 0.7,
+          max_tokens: options.maxTokens || 1024,
+          top_p: options.topP || 0.95
+        });
+        
+        return {
+          success: true,
+          response: response,
+          source: 'gradio'
+        };
+      } catch (error) {
+        console.warn("Gradio API failed, falling back to backend API:", error);
+        useGradioApi = false; // Disable for future requests in this session
+      }
+    }
+    
+    // Fall back to regular API
     return apiRequest('/query', 'POST', { message });
   },
   
@@ -177,6 +204,43 @@ const aiService = {
    */
   auraAction: async (action) => {
     return apiRequest('/aura/action', 'POST', { action });
+  },
+  
+  /**
+   * Check if the model is available (including Gradio)
+   */
+  checkModelAvailability: async () => {
+    try {
+      // Check Gradio availability
+      const gradioAvailable = await gradioService.checkAvailability();
+      
+      if (gradioAvailable) {
+        useGradioApi = true;
+        return {
+          available: true,
+          source: 'gradio',
+          message: 'Connected to Hugging Face Gradio API'
+        };
+      }
+      
+      // Fall back to backend status check
+      const status = await aiService.getModelStatus();
+      useGradioApi = false;
+      
+      return {
+        available: status.online,
+        source: 'backend',
+        message: status.status
+      };
+    } catch (error) {
+      useGradioApi = false;
+      console.error("Error checking model availability:", error);
+      return {
+        available: false,
+        source: 'error',
+        message: error.message
+      };
+    }
   }
 };
 
