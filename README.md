@@ -1,43 +1,62 @@
-# AURA API with Jarvis Model
+---
+title: aura-api
+emoji: 🤖
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: 3.50.2
+app_file: app.py
+pinned: false
+---
 
-This Hugging Face Space hosts the AURA (Augmented User Response Assistant) model, using the custom fine-tuned `naxwinn/qlora-jarvis-output` model.
+# AURA - Augmented User Response Assistant
+
+AURA is an advanced AI assistant that combines multiple AI models and services to provide a comprehensive user experience. The system integrates:
+
+- Google's Gemini API for natural language processing
+- Hugging Face models for specialized tasks
+- AURA Core for enhanced functionality
+- Spline 3D visualization for immersive UI
 
 ## Features
 
-### Chat Interface
-- Conversational interface with the Jarvis model
-- Support for system prompts to guide responses
-- Chat history tracking
+- **Unified Input System**: Process both commands and conversations through a single interface
+- **Voice Integration**: Text-to-speech capabilities for responses
+- **3D Visualization**: Interactive Spline scenes for enhanced user experience
+- **Diagnostic Tools**: Built-in system diagnostics and monitoring
+- **AURA Core Integration**: Advanced AI capabilities through the AURA Core system
 
-### Command Execution
-- Execute commands through the model
-- Built-in commands: `status`, `help`
-- Model-interpreted commands for other inputs
+## Technical Details
 
-### Status Monitoring
-- Check model status
-- Load/reload model when needed
-- View model health information
+- **Frontend**: React with styled-components and Framer Motion
+- **Backend**: FastAPI with Python
+- **AI Models**: Gemini API and Hugging Face models
+- **3D Visualization**: Spline scenes for background and foreground elements
+- **Voice**: Text-to-speech integration with audio playback
 
-## Integration with AURA Frontend
+## Configuration
 
-To connect your AURA frontend to this Gradio Space:
+The system uses environment variables for configuration:
 
-1. **Option 1**: Use the direct Gradio API endpoints:
-   - The Gradio interface creates API endpoints at `/api/predict`
-   - Check the API documentation by clicking the "API" tab in the Gradio interface
+```env
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-1.5-pro-latest
+HF_MODEL_NAME=your_huggingface_model
+USE_HUGGINGFACE=true
+```
 
-2. **Option 2**: Add a custom FastAPI backend to your project:
-   - Use the model directly through Hugging Face's model repository
-   - `from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline`
-   - `model = AutoModelForCausalLM.from_pretrained("naxwinn/qlora-jarvis-output")`
+## Development
 
-## About the Model
+To run the development server:
 
-This Space serves the `naxwinn/qlora-jarvis-output` model, which is a fine-tuned language model specifically for AURA assistant capabilities.
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-## Performance Notes
+# Start the server
+python api_server.py
+```
 
-- The first request may take longer as the model needs to be loaded into memory
-- Subsequent requests will be faster
-- The model runs on CPU in the free tier, which might result in slower responses
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

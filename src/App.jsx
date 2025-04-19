@@ -6,7 +6,6 @@ import ChatInterface from './components/ChatInterface';
 import Header from './components/Header';
 import DiagnosticPanel from './components/DiagnosticPanel';
 import AuraIntegration from './components/AuraIntegration';
-import ModelInfo from './components/ModelInfo';
 import aiService from './services/aiService';
 
 const AppContainer = styled.div`
@@ -254,11 +253,6 @@ const App = () => {
   const foregroundSplineRef = useRef();
   const audioRef = useRef(new Audio());
   const [playingAudioId, setPlayingAudioId] = useState(null);
-  const [modelInfo, setModelInfo] = useState({
-    available: false,
-    source: 'checking...',
-    message: 'Checking model availability...'
-  });
 
   useEffect(() => {
     // Check model status on initial load
@@ -294,31 +288,6 @@ const App = () => {
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
     };
-  }, []);
-
-  useEffect(() => {
-    const checkModelAvailability = async () => {
-      try {
-        const availability = await aiService.checkModelAvailability();
-        setModelInfo(availability);
-        
-        if (availability.available) {
-          showNotification(`Connected to ${availability.source === 'gradio' ? 'Hugging Face Gradio' : 'AURA backend'}`);
-        } else {
-          showNotification(`Model not available: ${availability.message}`, 'error');
-        }
-      } catch (error) {
-        console.error("Error checking model availability:", error);
-        setModelInfo({
-          available: false,
-          source: 'error',
-          message: error.message
-        });
-        showNotification("Error connecting to AI model", 'error');
-      }
-    };
-    
-    checkModelAvailability();
   }, []);
 
   const checkModelStatus = async () => {
@@ -375,8 +344,7 @@ const App = () => {
         const responseMessage = {
           id: Date.now(),
           role: 'assistant',
-          content: result.message || 'Command executed',
-          source: result.source || 'backend'
+          content: result.message || 'Command executed'
         };
         setMessages(prevMessages => [...prevMessages, responseMessage]);
         
@@ -392,16 +360,13 @@ const App = () => {
         }
       } else {
         // Handle as conversation
-        const response = await aiService.sendMessage(userInput, {
-          systemMessage: "You are AURA, an advanced AI assistant. Be helpful, concise, and friendly."
-        });
+        const response = await aiService.sendMessage(userInput);
         
         // Add AI response to chat
         const responseMessage = {
           id: Date.now(),
           role: 'assistant',
-          content: response.response || "I couldn't generate a response at this time.",
-          source: response.source || 'backend'
+          content: response.response || "I couldn't generate a response at this time."
         };
         setMessages(prevMessages => [...prevMessages, responseMessage]);
         
@@ -418,8 +383,7 @@ const App = () => {
       const errorMessage = {
         id: Date.now(),
         role: 'assistant',
-        content: `Error: ${error.message || 'Something went wrong'}`,
-        source: 'error'
+        content: `Error: ${error.message || 'Something went wrong'}`
       };
       setMessages(prevMessages => [...prevMessages, errorMessage]);
     } finally {
@@ -481,8 +445,8 @@ const App = () => {
     }
   };
 
-  const showNotification = (message, type = 'info') => {
-    setNotification({ message, type });
+  const showNotification = (message) => {
+    setNotification(message);
     // Clear notification after 5 seconds
     setTimeout(() => setNotification(null), 5000);
   };
@@ -518,40 +482,6 @@ const App = () => {
     showNotification(newMode ? 'Voice mode enabled' : 'Voice mode disabled');
   };
 
-  // Add this function before the return statement
-  const renderMessage = (message) => {
-    const isUser = message.role === 'user';
-    const source = message.source || '';
-    
-    return (
-      <ChatMessage 
-        key={message.id}
-        className={isUser ? 'user-message' : 'ai-message'}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className={isUser ? 'user-avatar' : 'ai-avatar'}>
-          {isUser ? '👤' : '🤖'}
-        </div>
-        <div className="message-content">
-          <div className="message-text">{message.content}</div>
-          {!isUser && source && (
-            <div className="message-source">via {source}</div>
-          )}
-          {!isUser && (
-            <AudioButton 
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => playMessageAudio(message)}
-            >
-              {playingAudioId === message.id ? '⏸' : '🔊'}
-            </AudioButton>
-          )}
-        </div>
-      </ChatMessage>
-    );
-  };
-
   return (
     <ThemeProvider theme={darkTheme}>
       <AppContainer>
@@ -561,7 +491,6 @@ const App = () => {
         <WatermarkCover style={{ bottom: '10px', right: '0' }} />
         <WatermarkCover style={{ bottom: '0', right: '10px' }} />
         
-        <ModelInfo info={modelInfo} />
         <AuraIntegration onUseAuraChange={handleUseAuraChange} />
         
         <motion.button
@@ -672,7 +601,25 @@ const App = () => {
               
               <ChatBody>
                 <AnimatePresence>
-                  {messages.map((message) => renderMessage(message))}
+                  {messages.map((message) => (
+                    <ChatMessage 
+                      key={message.id}
+                      isUser={message.role === 'user'}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      {message.content}
+                      {message.role === 'assistant' && (
+                        <AudioButton 
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => playMessageAudio(message)}
+                        >
+                          {playingAudioId === message.id ? '⏸' : '🔊'}
+                        </AudioButton>
+                      )}
+                    </ChatMessage>
+                  ))}
                 </AnimatePresence>
                 
                 {isLoading && (
@@ -716,14 +663,11 @@ const App = () => {
 
             {notification && (
               <NotificationContainer
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                style={{ 
-                  backgroundColor: notification.type === 'error' ? '#e74c3c' : '#3498db'
-                }}
               >
-                {notification.message}
+                {notification}
               </NotificationContainer>
             )}
           </BottomContainer>

@@ -1,6 +1,3 @@
-// Import polyfills and patches first
-import './splineRuntimePatch';
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createGlobalStyle } from 'styled-components';
